@@ -1,0 +1,29 @@
+base: &base
+
+
+  weight_init: {conv_init: 'normal', conv_scale: 0.02, conv_bias: 0.}
+
+  lr: 1E-4
+
+  expdir: '/global/cscratch1/sd/pharring/nbody2hydro/expts/'
+  box_size: 512
+  ngpu: 1 
+  num_epochs: 10
+  num_data_workers: 2
+  rotate_input: 1
+  transposed_input: 0
+  LAMBDA_2: 1E-2
+  data_size: 256
+  N_out_channels: 5
+  batch_size: 1
+  Nsamples: 20
+  enable_amp: False
+
+withAMP:
+  <<: *base
+  enable_amp: True
+
+multi8: 
+  <<: *base
+  ngpu: 8
+
