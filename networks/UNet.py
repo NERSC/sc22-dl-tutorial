@@ -47,6 +47,7 @@ class UNet(nn.Module):
         self.conv_up3 = up_conv(256+256, 128)
         self.conv_up2 = up_conv(128+128, 64)
         self.conv_last = nn.ConvTranspose3d(64+64, params.N_out_channels, 4, stride=2, padding=1, output_padding=0)
+        self.tanh = nn.Tanh()
         
         
     def forward(self, x):
@@ -68,7 +69,7 @@ class UNet(nn.Module):
         x = self.conv_up2(x) # 64
         x = torch.cat([x, conv1], dim=1)
         x = self.conv_last(x) # 5
-        out = nn.Tanh()(x)
+        out = self.tanh(x)
         return out
 
     def get_weights_function(self, params):
