@@ -20,8 +20,8 @@ from networks import UNet
 
 def train(params, args, world_rank):
   logging.info('rank %d, begin data loader init'%world_rank)
-  train_data_loader = get_data_loader_distributed(params, world_rank)
-  logging.info('rank %d, data loader initialized'%world_rank)
+  train_data_loader, val_data_loader = get_data_loader_distributed(params, world_rank)
+  logging.info('rank %d, data loader initialized with config %s'%(world_rank, params.data_loader_config))
 
   model = UNet.UNet(params).cuda()
   model.apply(model.get_weights_function(params.weight_init))
@@ -35,20 +35,48 @@ def train(params, args, world_rank):
 
   iters = 0
   startEpoch = 0
-
+  device = torch.cuda.current_device()
+  
   if world_rank==0:
     logging.info(model)
+    logging.info("Warming up 20 iters ...")
+  wstart = time.time()
+  for i, data in enumerate(train_data_loader, 0):
+    iters += 1
+    if iters>20:
+        break
+    inp, tar = map(lambda x: x.to(device), data)
+    tr_start = time.time()
+    b_size = inp.size(0)
+    
+    optimizer.zero_grad()
+    with autocast(params.enable_amp):
+      gen = model(inp)
+      loss = UNet.loss_func(gen, tar, params)
+
+    if params.enable_amp:
+      scaler.scale(loss).backward()
+      scaler.step(optimizer)
+      scaler.update()
+    else:
+      loss.backward()
+      optimizer.step()
+  wend = time.time()
+
+  if world_rank==0:
+    logging.info("Warmup took {} seconds, avg {} iters/sec".format(wend-wstart, 20/(wend-wstart)))
     logging.info("Starting Training Loop...")
 
-  device = torch.cuda.current_device()
   t1 = time.time()
   for epoch in range(startEpoch, startEpoch+params.num_epochs):
     start = time.time()
     tr_time = 0.
+    dat_time = 0.
     log_time = 0.
 
     for i, data in enumerate(train_data_loader, 0):
       iters += 1
+      dat_start = time.time()
       inp, tar = map(lambda x: x.to(device), data)
       tr_start = time.time()
       b_size = inp.size(0)
@@ -68,16 +96,18 @@ def train(params, args, world_rank):
       
       tr_end = time.time()
       tr_time += tr_end - tr_start
-
+      dat_time += tr_start - dat_start
 
     end = time.time()
     if world_rank==0:
-      logging.info('Time taken for epoch {} is {} sec'.format(epoch + 1, end-start))
+      logging.info('Time taken for epoch {} is {} sec, avg {} iters/sec'.format(epoch + 1, end-start, params.Nsamples/(end-start)))
+      logging.info('Step breakdown:')
+      logging.info('Data load: %.2f ms, U-Net fwd/back/optim: %.2f ms'%(1e3*dat_time/params.Nsamples, 1e3*tr_time/params.Nsamples))
 
   t2 = time.time()
   tottime = t2 - t1
   if world_rank==0:
-    logging.info('Total time is {} sec, avg {} samples/sec'.format(tottime, params.Nsamples*params.num_epochs/tottime))
+    logging.info('Total time is {} sec, avg {} iters/sec'.format(tottime, params.Nsamples*params.num_epochs/tottime))
 
 
 

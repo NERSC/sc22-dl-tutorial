@@ -1,23 +1,26 @@
 base: &base
 
-
+  # Training config
   weight_init: {conv_init: 'normal', conv_scale: 0.02, conv_bias: 0.}
-
   lr: 1E-4
-
-  expdir: '/global/cscratch1/sd/pharring/nbody2hydro/expts/'
-  box_size: 512
-  ngpu: 1 
-  num_epochs: 10
-  num_data_workers: 2
-  rotate_input: 1
-  transposed_input: 0
-  LAMBDA_2: 1E-2
-  data_size: 256
-  N_out_channels: 5
+  lambda_rho: 1E-2 # weight for additional rho loss term
   batch_size: 1
-  Nsamples: 20
+  num_epochs: 2
   enable_amp: False
+  ngpu: 1
+  expdir: '/global/cscratch1/sd/pharring/nbody2hydro/sc21/expts/'
+
+  # Data
+  data_loader_config: 'synthetic' # choices: 'synthetic', 'inmem', or 'lowmem'
+  box_size: 512 # total size of simulation box
+  data_size: 256 # size of crops for training
+  num_data_workers: 2 # number of dataloader worker threads per proc
+  N_out_channels: 5
+  train_path: None
+  val_path: None
+  use_cache: None # set this to a cache dir (e.g., NVMe on CoriGPU) if you copied data there
+  Nsamples: 20
+  Nsamples_val: 20
 
 withAMP:
   <<: *base
@@ -27,3 +30,21 @@ multi8:
   <<: *base
   ngpu: 8
 
+cosmo:
+  <<: *base
+  data_loader_config: 'lowmem'
+  train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
+  val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
+  use_cache: '/tmp/'
+  #Nsamples: 500
+  #Nsamples_val: 256
+
+cosmo_small:
+  <<: *base
+  data_loader_config: 'lowmem'
+  train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
+  val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
+  use_cache: '/tmp/'
+  data_size: 128
+  #Nsamples: 500
+  #Nsamples_val: 256
