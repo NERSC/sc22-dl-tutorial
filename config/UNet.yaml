@@ -35,16 +35,18 @@ cosmo:
   data_loader_config: 'lowmem'
   train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
   val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
-  use_cache: '/tmp/'
-  #Nsamples: 500
-  #Nsamples_val: 256
+  use_cache: None # '/tmp/'
+  Nsamples: 1000
+  Nsamples_val: 64
+  num_epochs: 5
 
 cosmo_small:
   <<: *base
   data_loader_config: 'lowmem'
   train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
   val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
-  use_cache: '/tmp/'
+  use_cache: None #'/tmp/'
   data_size: 128
-  #Nsamples: 500
-  #Nsamples_val: 256
+  Nsamples: 1000
+  Nsamples_val: 256
+  num_epochs: 20

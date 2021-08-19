@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.cuda.amp import autocast, GradScaler
 import torch.multiprocessing
+from torch.utils.tensorboard import SummaryWriter
 
 import logging
 from utils import logging_utils
@@ -37,46 +38,15 @@ def train(params, args, world_rank):
   startEpoch = 0
   device = torch.cuda.current_device()
   
-  if world_rank==0:
-    logging.info(model)
-    logging.info("Warming up 20 iters ...")
-  wstart = time.time()
-  for i, data in enumerate(train_data_loader, 0):
-    iters += 1
-    if iters>20:
-        break
-    inp, tar = map(lambda x: x.to(device), data)
-    tr_start = time.time()
-    b_size = inp.size(0)
-    
-    optimizer.zero_grad()
-    with autocast(params.enable_amp):
-      gen = model(inp)
-      loss = UNet.loss_func(gen, tar, params)
-
-    if params.enable_amp:
-      scaler.scale(loss).backward()
-      scaler.step(optimizer)
-      scaler.update()
-    else:
-      loss.backward()
-      optimizer.step()
-  wend = time.time()
-
-  if world_rank==0:
-    logging.info("Warmup took {} seconds, avg {} iters/sec".format(wend-wstart, 20/(wend-wstart)))
-    logging.info("Starting Training Loop...")
-
-  t1 = time.time()
-  for epoch in range(startEpoch, startEpoch+params.num_epochs):
-    start = time.time()
-    tr_time = 0.
-    dat_time = 0.
-    log_time = 0.
-
+  if args.no_val:
+    if world_rank==0:
+      logging.info(model)
+      logging.info("Warming up 20 iters ...")
+    wstart = time.time()
     for i, data in enumerate(train_data_loader, 0):
       iters += 1
-      dat_start = time.time()
+      if iters>20:
+          break
       inp, tar = map(lambda x: x.to(device), data)
       tr_start = time.time()
       b_size = inp.size(0)
@@ -93,6 +63,43 @@ def train(params, args, world_rank):
       else:
         loss.backward()
         optimizer.step()
+    wend = time.time()
+
+    if world_rank==0:
+      logging.info("Warmup took {} seconds, avg {} iters/sec".format(wend-wstart, 20/(wend-wstart)))
+    
+  if world_rank==0: 
+    logging.info("Starting Training Loop...")
+
+  t1 = time.time()
+  for epoch in range(startEpoch, startEpoch+params.num_epochs):
+    start = time.time()
+    tr_loss = []
+    tr_time = 0.
+    dat_time = 0.
+    log_time = 0.
+
+    model.train()
+    for i, data in enumerate(train_data_loader, 0):
+      iters += 1
+      dat_start = time.time()
+      inp, tar = map(lambda x: x.to(device), data)
+      tr_start = time.time()
+      b_size = inp.size(0)
+      
+      optimizer.zero_grad()
+      with autocast(params.enable_amp):
+        gen = model(inp)
+        loss = UNet.loss_func(gen, tar, params)
+        tr_loss.append(loss.item())
+
+      if params.enable_amp:
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+      else:
+        loss.backward()
+        optimizer.step()
       
       tr_end = time.time()
       tr_time += tr_end - tr_start
@@ -101,8 +108,26 @@ def train(params, args, world_rank):
     end = time.time()
     if world_rank==0:
       logging.info('Time taken for epoch {} is {} sec, avg {} iters/sec'.format(epoch + 1, end-start, params.Nsamples/(end-start)))
-      logging.info('Step breakdown:')
-      logging.info('Data load: %.2f ms, U-Net fwd/back/optim: %.2f ms'%(1e3*dat_time/params.Nsamples, 1e3*tr_time/params.Nsamples))
+      logging.info('  Step breakdown:')
+      logging.info('  Data to GPU: %.2f ms, U-Net fwd/back/optim: %.2f ms'%(1e3*dat_time/params.Nsamples, 1e3*tr_time/params.Nsamples))
+      logging.info('  Avg train loss=%f'%np.mean(tr_loss))
+      args.tboard_writer.add_scalar('Loss/train', np.mean(tr_loss), iters)
+
+    val_start = time.time()
+    val_loss = []
+    model.eval()
+    if not args.no_val and world_rank==0:
+      for i, data in enumerate(val_data_loader, 0):
+        with autocast(params.enable_amp):
+          with torch.no_grad():
+            inp, tar = map(lambda x: x.to(device), data)
+            gen = model(inp)
+            loss = UNet.loss_func(gen, tar, params)
+            val_loss.append(loss.item())
+      val_end = time.time()
+      logging.info('  Avg val loss=%f'%np.mean(val_loss))
+      logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
+      args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
 
   t2 = time.time()
   tottime = t2 - t1
@@ -118,6 +143,7 @@ if __name__ == '__main__':
   parser.add_argument("--run_num", default='00', type=str)
   parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str)
   parser.add_argument("--config", default='base', type=str)
+  parser.add_argument("--no_val", action='store_true', help='skip validation steps (for profiling train only)')
   args = parser.parse_args()
   
   run_num = args.run_num
@@ -146,6 +172,7 @@ if __name__ == '__main__':
       os.makedirs(expDir)
     logging_utils.log_to_file(logger_name=None, log_filename=os.path.join(expDir, 'out.log'))
     params.log()
+    args.tboard_writer = SummaryWriter(log_dir=os.path.join(expDir, 'logs/'))
 
   params.experiment_dir = os.path.abspath(expDir)
 
