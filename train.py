@@ -10,6 +10,7 @@ import torch.optim as optim
 from torch.cuda.amp import autocast, GradScaler
 import torch.multiprocessing
 from torch.utils.tensorboard import SummaryWriter
+from torch.nn.parallel import DistributedDataParallel
 
 import logging
 from utils import logging_utils
@@ -19,25 +20,35 @@ from utils.data_loader import get_data_loader_distributed
 from networks import UNet
 
 
+def cosine_schedule(optimizer, iternum, start_lr=1e-4, tot_steps=1000, end_lr=0., warmup_steps=0): 
+  if iternum<warmup_steps:
+    lr = (iternum/warmup_steps)*start_lr
+  else:
+    lr = end_lr + 0.5 * (start_lr - end_lr) * (1 + np.cos(np.pi * (iternum - warmup_steps)/tot_steps))
+  optimizer.param_groups[0]['lr'] = lr
+
+
 def train(params, args, world_rank):
   logging.info('rank %d, begin data loader init'%world_rank)
   train_data_loader, val_data_loader = get_data_loader_distributed(params, world_rank)
   logging.info('rank %d, data loader initialized with config %s'%(world_rank, params.data_loader_config))
 
-  model = UNet.UNet(params).cuda()
+
+  device = torch.device('cuda:%d'%args.local_rank)
+
+  model = UNet.UNet(params).to(device)
   model.apply(model.get_weights_function(params.weight_init))
 
-  optimizer = optim.Adam(model.parameters(), lr = params.lr)
   if params.enable_amp:
     scaler = GradScaler()
-
   if params.distributed:
-    model = DistributedDataParallel(model) 
+    model = DistributedDataParallel(model, device_ids=[args.local_rank])
+  optimizer = optim.Adam(model.parameters(), lr = params.lr_schedule['start_lr'])
 
   iters = 0
   startEpoch = 0
-  device = torch.cuda.current_device()
-  
+  params.lr_schedule['tot_steps'] = params.num_epochs*len(train_data_loader)
+
   if args.no_val:
     if world_rank==0:
       logging.info(model)
@@ -71,6 +82,7 @@ def train(params, args, world_rank):
   if world_rank==0: 
     logging.info("Starting Training Loop...")
 
+  iters = 0
   t1 = time.time()
   for epoch in range(startEpoch, startEpoch+params.num_epochs):
     start = time.time()
@@ -87,6 +99,7 @@ def train(params, args, world_rank):
       tr_start = time.time()
       b_size = inp.size(0)
       
+      cosine_schedule(optimizer, iters, **params.lr_schedule)
       optimizer.zero_grad()
       with autocast(params.enable_amp):
         gen = model(inp)
@@ -107,11 +120,13 @@ def train(params, args, world_rank):
 
     end = time.time()
     if world_rank==0:
-      logging.info('Time taken for epoch {} is {} sec, avg {} iters/sec'.format(epoch + 1, end-start, params.Nsamples/(end-start)))
+      logging.info('Time taken for epoch {} is {} sec, avg {} iters/sec'.format(epoch + 1, end-start, len(train_data_loader)/(end-start)))
       logging.info('  Step breakdown:')
-      logging.info('  Data to GPU: %.2f ms, U-Net fwd/back/optim: %.2f ms'%(1e3*dat_time/params.Nsamples, 1e3*tr_time/params.Nsamples))
+      logging.info('  Data to GPU: %.2f ms, U-Net fwd/back/optim: %.2f ms'%(1e3*dat_time/len(train_data_loader), 1e3*tr_time/len(train_data_loader)))
       logging.info('  Avg train loss=%f'%np.mean(tr_loss))
       args.tboard_writer.add_scalar('Loss/train', np.mean(tr_loss), iters)
+      args.tboard_writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], iters)
+      args.tboard_writer.add_scalar('Avg iters per sec', len(train_data_loader)/(end-start), iters)
 
     val_start = time.time()
     val_loss = []
@@ -128,6 +143,7 @@ def train(params, args, world_rank):
       logging.info('  Avg val loss=%f'%np.mean(val_loss))
       logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
       args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
+      args.tboard_writer.flush()
 
   t2 = time.time()
   tottime = t2 - t1
@@ -159,7 +175,6 @@ if __name__ == '__main__':
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(backend='nccl',
                                          init_method='env://')
-    args.gpu = args.local_rank
     world_rank = torch.distributed.get_rank() 
 
   torch.backends.cudnn.benchmark = True
@@ -177,5 +192,7 @@ if __name__ == '__main__':
   params.experiment_dir = os.path.abspath(expDir)
 
   train(params, args, world_rank)
+  if params.distributed:
+    torch.distributed.barrier()
   logging.info('DONE ---- rank %d'%world_rank)
 

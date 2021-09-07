@@ -2,7 +2,7 @@ base: &base
 
   # Training config
   weight_init: {conv_init: 'normal', conv_scale: 0.02, conv_bias: 0.}
-  lr: 1E-4
+  lr_schedule: {start_lr: 1.E-4, end_lr: 0., warmup_steps: 0}
   lambda_rho: 1E-2 # weight for additional rho loss term
   batch_size: 1
   num_epochs: 2
@@ -12,7 +12,7 @@ base: &base
 
   # Data
   data_loader_config: 'synthetic' # choices: 'synthetic', 'inmem', or 'lowmem'
-  box_size: 512 # total size of simulation box
+  box_size: [1024, 1024] # total size of simulation boxes (train, validation) 
   data_size: 256 # size of crops for training
   num_data_workers: 2 # number of dataloader worker threads per proc
   N_out_channels: 5
@@ -30,23 +30,434 @@ multi8:
   <<: *base
   ngpu: 8
 
-cosmo:
+cosmo: &cosmo
   <<: *base
   data_loader_config: 'lowmem'
   train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
   val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
-  use_cache: None # '/tmp/'
+  use_cache: '/tmp/'
   Nsamples: 1000
   Nsamples_val: 64
-  num_epochs: 5
+  num_epochs: 20
+  batch_size: 1 
 
-cosmo_small:
+cosmo_small: &cosmo_small
   <<: *base
   data_loader_config: 'lowmem'
   train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
   val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
-  use_cache: None #'/tmp/'
+  use_cache: '/tmp/'
   data_size: 128
-  Nsamples: 1000
+  Nsamples: 4096
   Nsamples_val: 256
   num_epochs: 20
+  batch_size: 16
+
+
+#------------------------------------------------------------------------
+
+# A100 configs: for Perlmutter (crop sizes 128 and 256)
+
+#------------------------------------------------------------------------
+
+#                       ----   CROP SIZE 128   ----
+
+A100_crop128_1GPU: &crop128_A100
+  <<: *cosmo_small
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  use_cache: None
+  batch_size: 32
+  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
+
+
+A100_crop128_1GPU_long:
+  <<: *cosmo_small
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  use_cache: None
+  batch_size: 32
+  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
+  num_epochs: 40
+
+A100_crop128_1GPU_amp:
+  <<: *cosmo_small
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  use_cache: None
+  batch_size: 32
+  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
+  enable_amp: True
+
+  
+A100_crop128_4GPU:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.6E-3, end_lr: 0., warmup_steps: 0}
+  ngpu: 4
+
+A100_crop128_8GPU:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 3.2E-3, end_lr: 0., warmup_steps: 0}
+  ngpu: 8
+
+A100_crop128_32GPU:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.28E-2, end_lr: 0., warmup_steps: 0}
+  ngpu: 32
+
+
+A100_crop128_4GPU_sqrt:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 8.E-4, end_lr: 0., warmup_steps: 0}
+  ngpu: 4
+
+A100_crop128_8GPU_sqrt:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 0}
+  ngpu: 8
+
+A100_crop128_32GPU_sqrt:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 0}
+  ngpu: 32
+
+
+
+A100_crop128_4GPU_warm:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.6E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 4
+
+A100_crop128_8GPU_warm:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 3.2E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 8
+
+A100_crop128_32GPU_warm:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.28E-2, end_lr: 0., warmup_steps: 256}
+  ngpu: 32
+
+
+A100_crop128_4GPU_warmsqrt:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 4
+
+A100_crop128_8GPU_warmsqrt:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 8
+
+A100_crop128_32GPU_warmsqrt:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 32
+
+A100_crop128_128GPU_warmsqrt:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 128
+
+
+A100_crop128_4GPU_warmsqrt_amp:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 4
+  enable_amp: True
+
+A100_crop128_8GPU_warmsqrt_amp:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 8
+  enable_amp: True
+
+A100_crop128_32GPU_warmsqrt_amp:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 32
+  enable_amp: True
+
+A100_crop128_128GPU_warmsqrt_amp:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 128
+  enable_amp: True
+
+
+A100_crop128_4GPU_warmsqrt_long:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 512}
+  ngpu: 4
+  num_epochs: 40
+
+A100_crop128_8GPU_warmsqrt_long:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 512}
+  ngpu: 8
+  num_epochs: 40
+
+A100_crop128_32GPU_warmsqrt_long:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 512}
+  ngpu: 32
+  num_epochs: 40
+
+A100_crop128_128GPU_warmsqrt_long:
+  <<: *crop128_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 512}
+  ngpu: 128
+  num_epochs: 40
+
+
+
+#                       ----   CROP SIZE 64   ----
+
+A100_crop64_1GPU: &crop64_A100
+  <<: *cosmo_small
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_2048crop_train.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_1024crop_valid.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  box_size: [1024, 512]
+  use_cache: None
+  data_size: 64
+  Nsamples: 4096
+  Nsamples_val: 512
+  num_epochs: 80
+  batch_size: 64
+  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
+
+A100_crop64_1GPU_amp:
+  <<: *cosmo_small
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_2048crop_train.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_1024crop_valid.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  box_size: [1024, 512]
+  use_cache: None
+  data_size: 64
+  Nsamples: 4096
+  Nsamples_val: 512
+  num_epochs: 80
+  batch_size: 64
+  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
+  enable_amp: True
+
+A100_crop64_1GPU_L1only:
+  <<: *cosmo_small
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_2048crop_train.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_1024crop_valid.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  box_size: [1024, 512]
+  use_cache: None
+  data_size: 64
+  Nsamples: 4096
+  Nsamples_val: 512
+  num_epochs: 80
+  batch_size: 64
+  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
+  lambda_rho: 0.
+
+A100_crop64_1GPU_L1only_endLR10:
+  <<: *cosmo_small
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_2048crop_train.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_1024crop_valid.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  box_size: [1024, 512]
+  use_cache: None
+  data_size: 64
+  Nsamples: 4096
+  Nsamples_val: 512
+  num_epochs: 80
+  batch_size: 64
+  lr_schedule: {start_lr: 2.E-4, end_lr: 2.E-5, warmup_steps: 0}
+  lambda_rho: 0.
+
+
+A100_crop64_4GPU:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 8.E-4, end_lr: 0., warmup_steps: 0}
+  ngpu: 4
+
+A100_crop64_8GPU:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 1.6E-3, end_lr: 0., warmup_steps: 0}
+  ngpu: 8
+
+A100_crop64_32GPU:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 3.2E-3, end_lr: 0., warmup_steps: 0}
+  ngpu: 32
+
+A100_crop64_4GPU_warmsqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 4
+
+A100_crop64_8GPU_warmsqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 8
+
+A100_crop64_32GPU_warmsqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 32
+
+A100_crop64_128GPU_warmsqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 128
+
+
+A100_crop64_4GPU_warm128sqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 128}
+  ngpu: 4
+
+A100_crop64_8GPU_warm128sqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 128}
+  ngpu: 8
+
+A100_crop64_32GPU_warm128sqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 128}
+  ngpu: 32
+
+A100_crop64_128GPU_warm128sqrt:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 128}
+  ngpu: 128
+
+
+
+A100_crop64_4GPU_warmsqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 4
+  lambda_rho: 0.
+
+A100_crop64_8GPU_warmsqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 8
+  lambda_rho: 0.
+
+A100_crop64_32GPU_warmsqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 32
+  lambda_rho: 0.
+
+A100_crop64_128GPU_warmsqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 128
+  lambda_rho: 0.
+
+
+A100_crop64_4GPU_warm128sqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 128}
+  ngpu: 4
+  lambda_rho: 0.
+
+A100_crop64_8GPU_warm128sqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 128}
+  ngpu: 8
+  lambda_rho: 0.
+
+A100_crop64_32GPU_warm128sqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 128}
+  ngpu: 32
+  lambda_rho: 0.
+
+A100_crop64_128GPU_warm128sqrt_L1only:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 128}
+  ngpu: 128
+  lambda_rho: 0.
+
+
+A100_crop64_4GPU_warm128sqrt_L1only_endLR10:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 4.E-5, warmup_steps: 128}
+  ngpu: 4
+  lambda_rho: 0.
+
+A100_crop64_8GPU_warm128sqrt_L1only_endLR10:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 5.66E-5, warmup_steps: 128}
+  ngpu: 8
+  lambda_rho: 0.
+
+A100_crop64_32GPU_warm128sqrt_L1only_endLR10:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 1.13E-4, warmup_steps: 128}
+  ngpu: 32
+  lambda_rho: 0.
+
+A100_crop64_128GPU_warm128sqrt_L1only_endLR10:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 2.26E-4, warmup_steps: 128}
+  ngpu: 128
+  lambda_rho: 0.
+
+
+
+A100_crop64_4GPU_warmsqrt_amp:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 4
+  enable_amp: True
+
+A100_crop64_8GPU_warmsqrt_amp:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 256}
+  ngpu: 8
+  enable_amp: True
+
+A100_crop64_32GPU_warmsqrt_amp:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 32
+  enable_amp: True
+
+A100_crop64_128GPU_warmsqrt_amp:
+  <<: *crop64_A100
+  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 256}
+  ngpu: 128
+  enable_amp: True
+
+
+
+
+#                       ----   CROP SIZE 256   ----
+
+A100_crop256_1GPU: &crop256_A100
+  <<: *cosmo
+  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
+  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
+  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
+  use_cache: None
+  batch_size: 4
+  
+A100_crop256_4GPU:
+  <<: *crop256_A100
+  lr: 4E-4
+  ngpu: 4
+
+A100_crop256_8GPU:
+  <<: *crop256_A100
+  lr: 8E-4
+  ngpu: 8
+
+A100_crop256_32GPU:
+  <<: *crop256_A100
+  lr: 3.2E-3
+  ngpu: 32

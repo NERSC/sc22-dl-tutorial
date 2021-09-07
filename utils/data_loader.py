@@ -71,7 +71,7 @@ class RandomCropDataset(Dataset):
         self.fname = params.train_path if not validation else params.val_path
         if params.use_cache:
             self.fname = os.path.join(params.use_cache, os.path.basename(self.fname))
-        self.length = params.box_size
+        self.length = params.box_size[0] if not validation else params.box_size[1]
         self.size = params.data_size
         self.Nsamples = params.Nsamples if not validation else params.Nsamples_val
         self.rotate = RandomRotator()
