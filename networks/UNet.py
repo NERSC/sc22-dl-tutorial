@@ -37,15 +37,19 @@ class UNet(nn.Module):
 
     def __init__(self, params):
         super().__init__()
+        self.full_scale = params.full_scale
         self.conv_down1 = down_conv(4, 64)
         self.conv_down2 = down_conv(64, 128)
         self.conv_down3 = down_conv(128, 256)
         self.conv_down4 = down_conv(256, 512)        
         self.conv_down5 = down_conv(512, 512)
-        self.conv_down6 = down_conv(512, 512)
+        if self.full_scale:
+          self.conv_down6 = down_conv(512, 512)
 
-        self.conv_up6 = up_conv(512, 512)
-        self.conv_up5 = up_conv(512+512, 512)
+          self.conv_up6 = up_conv(512, 512)
+          self.conv_up5 = up_conv(512+512, 512)
+        else:
+          self.conv_up5 = up_conv(512, 512)
         self.conv_up4 = up_conv(512+512, 256)
         self.conv_up3 = up_conv(256+256, 128)
         self.conv_up2 = up_conv(128+128, 64)
@@ -59,10 +63,13 @@ class UNet(nn.Module):
         conv3 = self.conv_down3(conv2) # 256
         conv4 = self.conv_down4(conv3) # 512
         conv5 = self.conv_down5(conv4) # 512
-        conv6 = self.conv_down6(conv5) # 512
+        if self.full_scale:
+          conv6 = self.conv_down6(conv5) # 512
         
-        x = self.conv_up6(conv6) # 512
-        x = torch.cat([x, conv5], dim=1)
+          x = self.conv_up6(conv6) # 512
+          x = torch.cat([x, conv5], dim=1)
+        else:
+          x = conv5
         x = self.conv_up5(x) # 512
         x = torch.cat([x, conv4], dim=1)
         x = self.conv_up4(x) # 256

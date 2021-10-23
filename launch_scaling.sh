@@ -1,8 +1,9 @@
 #!/bin/bash
 
-tag=crop64_warm128sqrt_L1only_endLR10
+#some name for the set of jobs
+tag=crop64
 
-sbatch --job-name=crop64_1gpu_L1only pm_submit_singlenode.slr 1
+sbatch --job-name=crop64_1gpu pm_submit_singlenode.slr 1
 
 sbatch --job-name=${tag}_4gpu pm_submit_singlenode.slr 4
 
