@@ -1,7 +1,17 @@
+# SC21 Deep Learning at Scale Tutorial
+
+This repository contains the example code material for the SC20 tutorial:
+*Deep Learning at Scale*.
+
+**Contents**
+
+## Links
+
+## Installation
+
 ## 3D U-Net for Cosmological Simulations
 
 U-Net model adapted from https://arxiv.org/abs/2106.12662
-
 
 ### Configuring
 Configs are stored in `config/UNet.yaml`. Adjust paths as needed to point to your data copies and scratch directory to store experiment results. Data can be downloaded from https://portal.nersc.gov/project/dasrepo/pharring/
