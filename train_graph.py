@@ -1,5 +1,6 @@
 import sys
 import os
+import gc
 import time
 import numpy as np
 import argparse
@@ -29,6 +30,57 @@ def cosine_schedule(optimizer, iternum, start_lr=1e-4, tot_steps=1000, end_lr=0.
   optimizer.param_groups[0]['lr'] = lr
 
 
+def capture_model(params, model, loss_func, lambda_rho, scaler, capture_stream, device, num_warmup=20):
+  print("Capturing Model")
+  inp_shape = (params.batch_size, 4, params.data_size, params.data_size, params.data_size)
+  tar_shape = (params.batch_size, 5, params.data_size, params.data_size, params.data_size)
+  static_input = torch.zeros(inp_shape, dtype=torch.float32, device=device)
+  static_label = torch.zeros(tar_shape, dtype=torch.float32, device=device)
+
+  capture_stream.wait_stream(torch.cuda.current_stream())
+  with torch.cuda.stream(capture_stream):
+    for _ in range(num_warmup):
+      model.zero_grad(set_to_none=True)
+      with autocast(params.enable_amp):
+        static_output = model(static_input)
+        static_loss = loss_func(static_output, static_label, lambda_rho)
+
+      if params.enable_amp:
+        scaler.scale(static_loss).backward()
+      else:
+        static_loss.backward()
+
+    # sync here
+    capture_stream.synchronize()
+    
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    # create graph
+    graph = torch.cuda._Graph()
+
+    # zero grads before capture:
+    model.zero_grad(set_to_none=True)
+
+    # start capture
+    graph.capture_begin()
+
+    with autocast(params.enable_amp):
+      static_output = model(static_input)
+      static_loss = loss_func(static_output, static_label, lambda_rho)
+
+      if params.enable_amp:
+        scaler.scale(static_loss).backward()
+      else:
+        static_loss.backward()
+
+    graph.capture_end()
+
+  torch.cuda.current_stream().wait_stream(capture_stream)
+
+  return graph, static_input, static_output, static_label, static_loss
+  
+
 def train(params, args, local_rank, world_rank):
   # set device and benchmark mode
   torch.backends.cudnn.benchmark = True
@@ -46,8 +98,14 @@ def train(params, args, local_rank, world_rank):
   
   if params.enable_amp:
     scaler = GradScaler()
-  if params.distributed:
-    model = DistributedDataParallel(model, device_ids=[local_rank])
+  else:
+    scaler = None
+
+  capture_stream = torch.cuda.Stream()
+  with torch.cuda.stream(capture_stream):
+    if params.distributed:
+      model = DistributedDataParallel(model, device_ids=[local_rank])
+  capture_stream.synchronize()
 
   if params.enable_apex:
     optimizer = aoptim.FusedAdam(model.parameters(), lr = params.lr_schedule['start_lr'],
@@ -75,6 +133,10 @@ def train(params, args, local_rank, world_rank):
     loss_func = UNet.loss_func
     lambda_rho = params.lambda_rho
 
+  # capture the model
+  graph, static_input, static_output, static_label, static_loss = capture_model(params, model, loss_func, lambda_rho, scaler,
+                                                                                capture_stream, device, num_warmup=20)
+  
   # start training
   iters = 0
   startEpoch = 0
@@ -93,17 +155,14 @@ def train(params, args, local_rank, world_rank):
       tr_start = time.time()
       b_size = inp.size(0)
       
-      optimizer.zero_grad()
-      with autocast(params.enable_amp):
-        gen = model(inp)
-        loss = loss_func(gen, tar, lambda_rho)
+      static_input.copy_(inp)
+      static_label.copy_(tar)
+      graph.replay()
 
       if params.enable_amp:
-        scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
       else:
-        loss.backward()
         optimizer.step()
     wend = time.time()
 
@@ -132,19 +191,18 @@ def train(params, args, local_rank, world_rank):
       b_size = inp.size(0)
       
       cosine_schedule(optimizer, iters, **params.lr_schedule)
-      optimizer.zero_grad()
-      with autocast(params.enable_amp):
-        gen = model(inp)
-        loss = loss_func(gen, tar, lambda_rho)
-        tr_loss.append(loss.item())
+
+      static_input.copy_(inp)
+      static_label.copy_(tar)
+      graph.replay()
 
       if params.enable_amp:
-        scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
       else:
-        loss.backward()
         optimizer.step()
+
+      tr_loss.append(static_loss.item())
 
       tr_end = time.time()
       tr_time += tr_end - tr_start

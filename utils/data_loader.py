@@ -10,7 +10,7 @@ def worker_init(wrk_id):
     np.random.seed(torch.utils.data.get_worker_info().seed%(2**32 - 1))
 
 
-def get_data_loader_distributed(params, world_rank):
+def get_data_loader_distributed(params, world_rank, device=0):
 
     if params.data_loader_config == 'synthetic':
         train_data =  RandomJunkDataset(params)
@@ -18,11 +18,19 @@ def get_data_loader_distributed(params, world_rank):
     else:
         train_data, val_data = RandomCropDataset(params, validation=False), RandomCropDataset(params, validation=True)
 
-    train_loader = DataLoader(train_data,
-                              batch_size=params.batch_size,
-                              num_workers=params.num_data_workers,
-                              worker_init_fn=worker_init,
-                              pin_memory=torch.cuda.is_available())
+    if not params.enable_benchy:
+        train_loader = DataLoader(train_data,
+                                  batch_size=params.batch_size,
+                                  num_workers=params.num_data_workers,
+                                  worker_init_fn=worker_init,
+                                  pin_memory=torch.cuda.is_available())
+    else:
+        from benchy.torch import BenchmarkDataLoader
+        train_loader = BenchmarkDataLoader(train_data,
+                                           batch_size=params.batch_size,
+                                           num_workers=params.num_data_workers,
+                                           worker_init_fn=worker_init,
+                                           pin_memory=torch.cuda.is_available())
     val_loader = DataLoader(val_data,
                               batch_size=params.batch_size,
                               num_workers=params.num_data_workers,
@@ -80,11 +88,10 @@ class RandomCropDataset(Dataset):
         self.inp_buff = np.zeros((4, self.size, self.size, self.size), dtype=np.float32)
         self.tar_buff = np.zeros((5, self.size, self.size, self.size), dtype=np.float32)
         if self.inmem:
-            with h5py.File(fname, 'r') as f:
+            with h5py.File(self.fname, 'r') as f:
                 self.Hydro = f['Hydro'][...]
                 self.Nbody = f['Nbody'][...]
-        else:
-            self.file = None
+        self.file = None
 
     def _open_file(self):
         self.file = h5py.File(self.fname, 'r')
@@ -112,7 +119,12 @@ class RandomCropDataset(Dataset):
         rand = np.random.randint(low=1, high=25)
         inp = np.copy(self.rotate(self.inp_buff, rand))
         tar = np.copy(self.rotate(self.tar_buff, rand))
-        return torch.as_tensor(inp), torch.as_tensor(tar)
+
+        # convert to tensor
+        inp_t = torch.as_tensor(inp)
+        tar_t = torch.as_tensor(tar)
+
+        return inp_t, tar_t
 
 
 class RandomRotator(object):

@@ -8,51 +8,27 @@ base: &base
   batch_size: 1
   num_epochs: 2
   enable_amp: False
+  enable_apex: False
+  enable_benchy: False
+  enable_jit: False
   ngpu: 1
-  expdir: '/global/cscratch1/sd/pharring/nbody2hydro/sc21/expts/'
+  expdir: '/logs'
 
   # Data
-  data_loader_config: 'synthetic' # choices: 'synthetic', 'inmem', or 'lowmem'
-  box_size: [1024, 1024] # total size of simulation boxes (train, validation) 
+  data_loader_config: 'synthetic' # choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'
+  box_size: [1024, 512] # total size of simulation boxes (train, validation)
   data_size: 256 # size of crops for training
   num_data_workers: 2 # number of dataloader worker threads per proc
   N_out_channels: 5
-  train_path: None
-  val_path: None
+  # HDF5 files for PyTorch native dataloader
+  train_path: '/data/downsamp_2048crop_train.h5'
+  val_path: '/data/downsamp_1024crop_valid.h5'
+  # numpy files for DALI dataloader
+  train_path_npy_data: '/data/downsamp_2048crop_train_data.npy'
+  train_path_npy_label: '/data/downsamp_2048crop_train_label.npy'
+  val_path_npy_data: '/data/downsamp_1024crop_valid_data.npy'
+  val_path_npy_label: '/data/downsamp_1024crop_valid_label.npy'
   use_cache: None # set this to a cache dir (e.g., NVMe on CoriGPU) if you copied data there
-  Nsamples: 20
-  Nsamples_val: 20
-
-withAMP:
-  <<: *base
-  enable_amp: True
-
-multi8: 
-  <<: *base
-  ngpu: 8
-
-cosmo: &cosmo
-  <<: *base
-  data_loader_config: 'lowmem'
-  train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
-  val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
-  use_cache: '/tmp/'
-  Nsamples: 1000
-  Nsamples_val: 64
-  num_epochs: 20
-  batch_size: 1 
-
-cosmo_small: &cosmo_small
-  <<: *base
-  data_loader_config: 'lowmem'
-  train_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop_transp.h5'
-  val_path: '/global/cscratch1/sd/pharring/nbody2hydro/datacopies/normalized1024_z3_alt_bigcrop2_transp.h5'
-  use_cache: '/tmp/'
-  data_size: 128
-  Nsamples: 4096
-  Nsamples_val: 256
-  num_epochs: 20
-  batch_size: 16
 
 
 #------------------------------------------------------------------------
@@ -66,12 +42,8 @@ cosmo_small: &cosmo_small
 
 
 A100_crop64_1GPU: &crop64_A100
-  <<: *cosmo_small
-  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_2048crop_train.h5'
-  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_1024crop_valid.h5'
-  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
-  box_size: [1024, 512]
-  use_cache: None
+  <<: *base
+  data_loader_config: 'lowmem'
   data_size: 64
   Nsamples: 4096
   Nsamples_val: 512
@@ -110,12 +82,8 @@ A100_crop64_128GPU:
 
 
 A100_crop96_1GPU: &crop96_A100
-  <<: *cosmo_small
-  train_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_2048crop_train.h5'
-  val_path: '/pscratch/sd/p/pharring/nbody2hydro/datacopies/downsamp_1024crop_valid.h5'
-  expdir: '/pscratch/sd/p/pharring/nbody2hydro/sc21/expts/'
-  box_size: [1024, 512]
-  use_cache: None
+  <<: *base
+  data_loader_config: 'lowmem'
   data_size: 96
   Nsamples: 4096
   Nsamples_val: 256

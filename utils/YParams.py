@@ -8,20 +8,16 @@ class YParams():
     self._config_name = config_name
     self.params = {}
 
-    if print_params: 
-      print("------------------ Configuration ------------------")
-
     with open(yaml_filename) as _file:
 
       for key, val in YAML().load(_file)[config_name].items():
-        if print_params: print(key, val)
         if val =='None': val = None
 
         self.params[key] = val
         self.__setattr__(key, val)
 
     if print_params:
-      print("---------------------------------------------------")
+      self.log()
 
   def __getitem__(self, key):
     return self.params[key]
@@ -33,7 +29,11 @@ class YParams():
     logging.info("------------------ Configuration ------------------")
     logging.info("Configuration file: "+str(self._yaml_filename))
     logging.info("Configuration name: "+str(self._config_name))
-    with open(self._yaml_filename) as yamlfile:
-      for key, val in YAML().load(yamlfile)[self._config_name].items():
-        logging.info(str(key) + ' ' + str(val))
+    for key, val in self.params.items():
+      logging.info(str(key) + ' ' + str(val))
     logging.info("---------------------------------------------------")
+
+  def update(self, new_params):
+    self.params.update(new_params)
+    for key, val in new_params.items():
+      self.__setattr__(key, val)
