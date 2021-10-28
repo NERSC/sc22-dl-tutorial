@@ -20,6 +20,6 @@ srun -u shifter --image=romerojosh/containers:sc21_tutorial --module=gpu \
     -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
     bash -c '
     source export_DDP_vars.sh
-    python train.py --config=A100_crop64_1GPU
+    python train.py --config=A100_crop64_sqrt --data_loader_config=dali-lowmem
     '
 

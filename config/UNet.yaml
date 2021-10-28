@@ -2,7 +2,6 @@ base: &base
 
   # Training config
   weight_init: {conv_init: 'normal', conv_scale: 0.02, conv_bias: 0.}
-  lr_schedule: {start_lr: 1.E-4, end_lr: 0., warmup_steps: 0}
   lambda_rho: 1E-2 # weight for additional rho loss term
   full_scale: True # whether or not to use all 6 of the scales in U-Net
   batch_size: 1
@@ -13,6 +12,15 @@ base: &base
   enable_jit: False
   ngpu: 1
   expdir: '/logs'
+  # params for setting learning rate (cosine decay schedule):
+  #   start_lr: initial learning rate
+  #   end_lr:  final learning rate
+  #   warmup_steps: number of steps over which to do linear warm-up of learning rate
+  #                 *not used when training single-GPU or when scaling='none'*
+  #   scaling: 'none' initial lr doesn't change with respect to number of GPUs (use for strong scaling)
+  #            'linear' scale up according to lr_nGPU = nGPUs*lr_1GPU
+  #            'sqrt' scale up according to lr_nGPU = sqrt(nGPUs)*lr_1GPU
+  lr_schedule: {scaling: 'none', start_lr: 1.E-4, end_lr: 0., warmup_steps: 0}
 
   # Data
   data_loader_config: 'synthetic' # choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'
@@ -34,14 +42,13 @@ base: &base
 #------------------------------------------------------------------------
 
 # A100 configs: for Perlmutter (crop sizes 64 and 96)
-# Learning rates are pre-computed to obey the square-root scaling rule lr_Ngpu = sqrt(Ngpu)*lr_singlegpu
 
 #------------------------------------------------------------------------
 
 #                       ----   CROP SIZE 64   ----
 
 
-A100_crop64_1GPU: &crop64_A100
+A100_crop64_sqrt: &crop64_A100
   <<: *base
   data_loader_config: 'lowmem'
   data_size: 64
@@ -49,39 +56,14 @@ A100_crop64_1GPU: &crop64_A100
   Nsamples_val: 512
   num_epochs: 80
   batch_size: 64
-  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
+  lr_schedule: {scaling: 'sqrt',start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
   lambda_rho: 0.
-
-A100_crop64_4GPU:
-  <<: *crop64_A100
-  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 128}
-  ngpu: 4
-  lambda_rho: 0.
-
-A100_crop64_8GPU:
-  <<: *crop64_A100
-  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 128}
-  ngpu: 8
-  lambda_rho: 0.
-
-A100_crop64_32GPU:
-  <<: *crop64_A100
-  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 128}
-  ngpu: 32
-  lambda_rho: 0.
-
-A100_crop64_128GPU:
-  <<: *crop64_A100
-  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 128}
-  ngpu: 128
-  lambda_rho: 0.
-
 
 
 #                       ----   CROP SIZE 96   ----
 
 
-A100_crop96_1GPU: &crop96_A100
+A100_crop96_sqrt: &crop96_A100
   <<: *base
   data_loader_config: 'lowmem'
   data_size: 96
@@ -90,31 +72,6 @@ A100_crop96_1GPU: &crop96_A100
   num_epochs: 80
   full_scale: False
   batch_size: 64
-  lr_schedule: {start_lr: 2.E-4, end_lr: 0., warmup_steps: 0}
-  lambda_rho: 0.
-
-
-A100_crop96_4GPU:
-  <<: *crop96_A100
-  lr_schedule: {start_lr: 4.E-4, end_lr: 0., warmup_steps: 128}
-  ngpu: 4
-  lambda_rho: 0.
-
-A100_crop96_8GPU:
-  <<: *crop96_A100
-  lr_schedule: {start_lr: 5.66E-4, end_lr: 0., warmup_steps: 128}
-  ngpu: 8
-  lambda_rho: 0.
-
-A100_crop96_32GPU:
-  <<: *crop96_A100
-  lr_schedule: {start_lr: 1.13E-3, end_lr: 0., warmup_steps: 128}
-  ngpu: 32
-  lambda_rho: 0.
-
-A100_crop96_128GPU:
-  <<: *crop96_A100
-  lr_schedule: {start_lr: 2.26E-3, end_lr: 0., warmup_steps: 128}
-  ngpu: 128
+  lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
   lambda_rho: 0.
 

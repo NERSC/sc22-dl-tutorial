@@ -17,17 +17,10 @@ import logging
 from utils import logging_utils
 logging_utils.config_logger()
 from utils.YParams import YParams
-from utils import get_data_loader_distributed
+from utils import get_data_loader_distributed, lr_schedule
 from networks import UNet
 
 import apex.optimizers as aoptim
-
-def cosine_schedule(optimizer, iternum, start_lr=1e-4, tot_steps=1000, end_lr=0., warmup_steps=0): 
-  if iternum<warmup_steps:
-    lr = (iternum/warmup_steps)*start_lr
-  else:
-    lr = end_lr + 0.5 * (start_lr - end_lr) * (1 + np.cos(np.pi * (iternum - warmup_steps)/tot_steps))
-  optimizer.param_groups[0]['lr'] = lr
 
 
 def capture_model(params, model, loss_func, lambda_rho, scaler, capture_stream, device, num_warmup=20):
@@ -81,7 +74,7 @@ def capture_model(params, model, loss_func, lambda_rho, scaler, capture_stream, 
   return graph, static_input, static_output, static_label, static_loss
   
 
-def train(params, args, local_rank, world_rank):
+def train(params, args, local_rank, world_rank, world_size):
   # set device and benchmark mode
   torch.backends.cudnn.benchmark = True
   torch.cuda.set_device(local_rank)
@@ -190,7 +183,7 @@ def train(params, args, local_rank, world_rank):
       tr_start = time.time()
       b_size = inp.size(0)
       
-      cosine_schedule(optimizer, iters, **params.lr_schedule)
+      lr_schedule(optimizer, iters, nGPU=world_size, **params.lr_schedule)
 
       static_input.copy_(inp)
       static_label.copy_(tar)
@@ -217,7 +210,7 @@ def train(params, args, local_rank, world_rank):
       logging.info('  Avg train loss=%f'%np.mean(tr_loss))
       args.tboard_writer.add_scalar('Loss/train', np.mean(tr_loss), iters)
       args.tboard_writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], iters)
-      args.tboard_writer.add_scalar('Avg iters per sec', len(train_data_loader)/(end-start), iters)
+      args.tboard_writer.add_scalar('Avg iters per sec', step_count/(end-start), iters)
 
     val_start = time.time()
     val_loss = []
@@ -238,8 +231,6 @@ def train(params, args, local_rank, world_rank):
 
   t2 = time.time()
   tottime = t2 - t1
-  if world_rank==0:
-    logging.info('Total time is {} sec, avg {} iters/sec'.format(tottime, params.Nsamples*params.num_epochs/tottime))
 
 
 
@@ -275,6 +266,9 @@ if __name__ == '__main__':
   params.distributed = False
   if 'WORLD_SIZE' in os.environ:
     params.distributed = int(os.environ['WORLD_SIZE']) > 1
+    world_size = int(os.environ['WORLD_SIZE'])
+  else:
+    world_size = 1
 
   world_rank = 0
   local_rank = 0
@@ -287,7 +281,7 @@ if __name__ == '__main__':
   # Set up directory
   baseDir = params.expdir
   expDir = os.path.join(baseDir, args.config+'/'+str(run_num)+'/')
-  if  world_rank==0:
+  if world_rank==0:
     if not os.path.isdir(expDir):
       os.makedirs(expDir)
     logging_utils.log_to_file(logger_name=None, log_filename=os.path.join(expDir, 'out.log'))
@@ -296,7 +290,7 @@ if __name__ == '__main__':
 
   params.experiment_dir = os.path.abspath(expDir)
 
-  train(params, args, local_rank, world_rank)
+  train(params, args, local_rank, world_rank, world_size)
   if params.distributed:
     torch.distributed.barrier()
   logging.info('DONE ---- rank %d'%world_rank)
