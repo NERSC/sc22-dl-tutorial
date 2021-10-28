@@ -124,7 +124,6 @@ class DaliDataLoader(object):
         # extract relevant parameters
         self.batch_size = params.batch_size
         self.size = params.data_size
-        self.Nsamples = num_samples
 
         # RNG
         self.rng = np.random.RandomState(seed=12345)
