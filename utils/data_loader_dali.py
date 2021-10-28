@@ -124,6 +124,7 @@ class DaliDataLoader(object):
         # extract relevant parameters
         self.batch_size = params.batch_size
         self.size = params.data_size
+        self.Nsamples = num_samples
 
         # RNG
         self.rng = np.random.RandomState(seed=12345)
@@ -145,11 +146,11 @@ class DaliDataLoader(object):
                                             auto_reset = True,
                                             prepare_first_batch = True)
 
-        self.length = params.box_size[0] if not validation else params.box_size[1]
+        self.Nsamples = num_samples//params.batch_size
 
         
     def __len__(self):
-        return self.length
+        return self.Nsamples
         
     def __iter__(self):
         for token in self.iterator:
