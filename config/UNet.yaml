@@ -56,7 +56,7 @@ A100_crop64_sqrt: &crop64_A100
   Nsamples_val: 512
   num_epochs: 80
   batch_size: 64
-  lr_schedule: {scaling: 'sqrt',start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
+  lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
   lambda_rho: 0.
 
 
