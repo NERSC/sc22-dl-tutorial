@@ -18,10 +18,22 @@ hostname
 
 #~/dummy
 
+# Profiling
+if [ "${ENABLE_PROFILING:-0}" -eq 1 ]; then
+    echo "Enabling profiling..."
+    NSYS_ARGS="--trace=cuda,cublas,nvtx --kill none -c cudaProfilerApi -f true"
+    PROFILE_OUTPUT=/logs/$SLURM_JOB_ID
+    export PROFILE_CMD="nsys profile $NSYS_ARGS -o $PROFILE_OUTPUT"
+fi
+
+set -x
 srun -u shifter --module=gpu \
     -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
-    bash -c '
+    bash -c "
     source export_DDP_vars.sh
-    python train.py --config=A100_crop64_sqrt --data_loader_config=dali-lowmem
-    '
+    ${PROFILE_CMD} python train.py \
+        --config=A100_crop64_sqrt \
+        --data_loader_config=dali-lowmem \
+        --enable_benchy
+    "
 
