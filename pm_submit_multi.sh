@@ -1,10 +1,12 @@
 #!/bin/bash 
-#SBATCH --nodes=2 --time=0:10:00  
 #SBATCH -C gpu 
-#SBATCH --tasks-per-node 4
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-task 1
-#SBATCH -J multinode
+#SBATCH --time=0:10:00
+#SBATCH --image=romerojosh/containers:sc21_tutorial
+#SBATCH -J crop64-multi
 #SBATCH -o %x-%j.out
 
 DATADIR=/pscratch/sd/j/joshr/nbody2hydro/datacopies
@@ -16,7 +18,7 @@ hostname
 
 #~/dummy
 
-srun -u shifter --image=romerojosh/containers:sc21_tutorial --module=gpu \
+srun -u shifter --module=gpu \
     -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
     bash -c '
     source export_DDP_vars.sh
