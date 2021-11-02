@@ -50,7 +50,7 @@ def capture_model(params, model, loss_func, lambda_rho, scaler, capture_stream, 
     torch.cuda.empty_cache()
 
     # create graph
-    graph = torch.cuda._Graph()
+    graph = torch.cuda.CUDAGraph()
 
     # zero grads before capture:
     model.zero_grad(set_to_none=True)
