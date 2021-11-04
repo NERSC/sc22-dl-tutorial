@@ -59,6 +59,17 @@ A100_crop64_sqrt: &crop64_A100
   lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
   lambda_rho: 0.
 
+V100_crop64_sqrt: &crop64_V100
+  <<: *base
+  data_loader_config: 'lowmem'
+  data_size: 64
+  Nsamples: 4096
+  Nsamples_val: 512
+  num_epochs: 80
+  batch_size: 32
+  lr_schedule: {scaling: 'sqrt', start_lr: 1.414214E-4, end_lr: 0., warmup_steps: 128}
+  lambda_rho: 0.
+
 
 #                       ----   CROP SIZE 96   ----
 
