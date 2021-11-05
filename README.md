@@ -83,7 +83,6 @@ Before generating a profile with Nsight, we can add NVTX ranges to the script to
 We can add some manually defined NVTX ranges to the code using `torch.cuda.nvtx.range_push` and `torch.cuda.nvtx.range_pop`.
 We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.stop()` to control the duration of the profiling
 (e.g., limit profiling to single epoch).
-Search `train.py` for comments labeled `# PROF` to see where we've added code.
 
 To generate a profile, use the following command if running interactively:
 * If running on a 40GB A100 card:
@@ -223,8 +222,10 @@ Increasing the number of workers to 8 improves performance to around 270 samples
 
 We can run the 8 worker configuration through profiler using the instructions in the previous section with the added `--num_data_workers`
 argument and load that profile in Nsight Systems. This is what this profile looks like:
+![NSYS Native Data](tutorial_images/nsys_nativedata_8workers.png)
 
 and zoomed in:
+![NSYS Native Data Zoomed](tutorial_images/nsys_nativedata_8workers_zoomed.png)
 
 With 8 data workers, the large gaps between steps are mostly alleviated, improving the throughput. Looking at the zoomed in profile, we
 still see that the H2D copy in of the input data takes some time and could be improved. One option here is to implement a prefetching
@@ -288,8 +289,13 @@ This is the performance of the training script for the first three epochs on a 4
 
 We can run the DALI case through profiler using the instructions in the earlier section with the added `--data_loader_config=dali-lowmem`
 argument and load that profile in Nsight Systems. This is what this profile looks like:
+![NSYS DALI](tutorial_images/nsys_dali.png)
 
-and zoomed in:
+and zoomed in to a single iteration:
+![NSYS DALI Zoomed](tutorial_images/nsys_dali_zoomed.png)
+
+With DALI, you will see that there are now multiple CUDA stream rows in the timeline view, corresponding to internal streams DALI uses
+to run data augmentation kernels and any memory movement concurrently with the existing PyTorch compute kernels. Stream 13 in this view, in particular, shows concurrent H2D memory copies of the batch input data, which is an improvement over the native dataloader.
 
 Running this case using benchy on Perlmutter results in the following throughput measurements:
 ```
