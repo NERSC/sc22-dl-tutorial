@@ -31,38 +31,119 @@ This launches runs for training with 1,4,8,32, and 128 GPUs, using the square ro
 
 ## Single GPU training
 
-To run single GPU training of the baseline training script, use the following command:
+To run a single GPU training of the baseline training script without optimizations, use the following command if running interactively:
+* If running on a 40GB A100 card:
 ```
-$ python ...
+$ python train.py --config=A100_crop64_sqrt --num_epochs 3
 ```
-This will run the training on a single GPU using batch size of ???
-(see `config/??.yaml` for specific configuration details).
-Note we will use batch size ??? for the optimization work in the next section
+* If running on a 16GB V100 card:
+```
+$ python train.py --config=V100_crop64_sqrt --num_epochs 3
+```
+This will run 3 epochs of training on a single GPU using a default batch size of 64 (A100) or 32 (V100).
+(see `config/UNet.yaml` for specific configuration details).
+Note we will use the default batch size for the optimization work in the next section
 and will push beyond to larger batch sizes in the distributed training section.
 
+On Perlmutter for the tutorial, we will be submitting jobs to the batch queue. To do this, use the following command:
+```
+$ sbatch -n 1 ./submit_pm.sh --num_epochs 3
+```
+`submit_pm.sh` is a batch submission script that defines resources to be requested by SLURM as well as the command to run.
+When using batch submission, you can see the job output by viewing the file `pm-crop64-<jobid>.out` in the submission
+directory. You can find the job id of your job using the command `squeue --me` and looking at the first column of the output.
+
+
 In the baseline configuration, the model converges to about ??% accuracy on
-the validation dataset in about ?? epochs:
+the validation dataset in about 80 epochs:
 
 ## Single GPU performance profiling and optimization
 
-This is the performance of the baseline script using the ??? container for the first two epochs on a 40GB A100 card with batch size ???:
+This is the performance of the baseline script for the first three epochs on a 40GB A100 card with batch size 64:
 ```
+2021-11-04 22:55:35,938 - root - INFO - Starting Training Loop...
+2021-11-04 22:57:26,711 - root - INFO - Time taken for epoch 1 is 110.77291631698608 sec, avg 36.976547482770506 samples/sec
+2021-11-04 22:57:26,712 - root - INFO -   Avg train loss=0.070412
+2021-11-04 22:57:37,105 - root - INFO -   Avg val loss=0.045423
+2021-11-04 22:57:37,105 - root - INFO -   Total validation time: 10.3925621509552 sec
+2021-11-04 22:58:25,442 - root - INFO - Time taken for epoch 2 is 48.334283113479614 sec, avg 84.74316233021143 samples/sec
+2021-11-04 22:58:25,442 - root - INFO -   Avg train loss=0.030585
+2021-11-04 22:58:30,963 - root - INFO -   Avg val loss=0.028449
+2021-11-04 22:58:30,963 - root - INFO -   Total validation time: 5.520469427108765 sec
+2021-11-04 22:59:19,717 - root - INFO - Time taken for epoch 3 is 48.75128531455994 sec, avg 84.01829764223055 samples/sec
+2021-11-04 22:59:19,718 - root - INFO -   Avg train loss=0.023032
+2021-11-04 22:59:24,683 - root - INFO -   Avg val loss=0.026098
+2021-11-04 22:59:24,684 - root - INFO -   Total validation time: 4.96534538269043 sec
 ```
+After the first epoch, we see that the throughput achieved is about 84 samples/s.
 
 ### Profiling with Nsight Systems
-Before generating a profile with Nsight, we can add NVTX ranges to the script to add context to the produced timeline. First, we can enable PyTorch's built-in NVTX annotations by using the `torch.autograd.profiler.emit_nvtx` context manager.
-We can also manually add some manually defined NVTX ranges to the code using `torch.cuda.nvtx.range_push` and `torch.cuda.nvtx.range_pop`. Search `train.py` for comments labeled `# PROF` to see where we've added code.
+Before generating a profile with Nsight, we can add NVTX ranges to the script to add context to the produced timeline.
+We can add some manually defined NVTX ranges to the code using `torch.cuda.nvtx.range_push` and `torch.cuda.nvtx.range_pop`.
+We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.stop()` to control the duration of the profiling
+(e.g., limit profiling to single epoch).
+Search `train.py` for comments labeled `# PROF` to see where we've added code.
 
-To generate a timeline, run the following:
+To generate a profile, use the following command if running interactively:
+* If running on a 40GB A100 card:
 ```
-$ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi ...
+$ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=A100_crop64_sqrt --num_epochs 2 --enable_manual_profiling
 ```
-This command will run two shortened epochs of ?? iterations of the training script and produce a file `baseline.qdrep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
+
+* If running on a 80GB A100 card:
+```
+$ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=A100_crop64_sqrt --num_epochs 2 --enable_manual_profiling
+```
+
+This command will run two epochs of the training script, profiling only 20 steps of the second epoch. It will produce a file `baseline.qdrep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
+
+If running on Perlmutter, the equivalent batch submission command is:
+```
+$ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --num_epochs 2 --enable_manual_profiling
+```
 
 Loading this profile in Nsight Systems will look like this:
 
-With our NVTX ranges, we can easily zoom into a single iteration and get an idea of where compute time is being spent:
+The large gap between iterations is due to the data loading, which we will address in the next section.
 
+Beyond this, we can easily zoom into a single iteration and get an idea of where compute time is being spent:
+
+
+#### (Optional) Using the benchy profiling tool
+As an alternative to manually specifying NVTX ranges, we've included the use of a simple profiling tool `benchy` that overrides the PyTorch dataloader in the script to produce throughput information to the terminal, as well as add NVTX ranges/profiler start and stop calls. This tool also runs a sequence of tests to measure and report the throughput of the dataloader in isolation, the model running with synthetic/cached data, and the throughput of the model running normally with real data.
+
+To run and generate a profile with benchy, use the following command if running interactively:
+* If running on a 40GB A100 card:
+```
+$ nsys profile -o baseline_benchy --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=A100_crop64_sqrt --enable_benchy
+```
+
+* If running on a 80GB A100 card:
+```
+$ nsys profile -o baseline_benchy --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=A100_crop64_sqrt --enable_benchy
+```
+
+If running on Perlmutter, the equivalent batch submission command is:
+```
+$ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline_benchy sbatch -n1 submit_pm.sh --enable_benchy
+```
+
+benchy uses epoch boundaries to separate the test trials it runs, so in these cases we are not limiting the number of epochs to 2.
+
+Besides the profile, benchy will also report throughput measurements directly to the terminal, including a simple summary of averages at the end of the job. For this case on Perlmutter, the summary output from benchy is:
+```
+BENCHY::SUMMARY::IO average trial throughput: 89.629 +/- 0.931
+BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 361.943 +/- 0.455
+BENCHY::SUMMARY::FULL average trial throughput: 89.693 +/- 0.491
+```
+From these throughput values, we can see that the `SYNTHETIC` (i.e. compute) throughput is greater than the `IO` (i.e. data loading) throughput.
+The `FULL` (i.e. real) throughput is bounded by the slower of these two values, which is `IO` in this case. What these throughput
+values indicate is the GPU can achieve much greater training throughput for this model, but is being limited by the data loading
+speed.
+
+Loading this profile in Nsight Systems will look like this:
+
+### Data loading optimizations with DALI
 
 ### Enabling Mixed Precision Training
 As a first step to improve the compute performance of this training script, we can enable automatic mixed precision (AMP) in PyTorch. AMP provides a simple way for users to convert existing FP32 training scripts to mixed FP32/FP16 precision, unlocking
@@ -81,8 +162,6 @@ With AMP enabled, this is the performance of the baseline using the ??? containe
 You can run another profile (using `--config=???`) with Nsight Systems. Loading this profile and zooming into a single iteration, this is what we see:
 
 With AMP enabled, we see that the `forward/loss/backward` time is significatly reduced. As this is a CNN, the forward and backward convolution ops are well-suited to benefit from acceleration with tensor cores.
-
-### Data loading optimizations with DALI
 
 ### Just-in-time (JIT) compiliation 
 
