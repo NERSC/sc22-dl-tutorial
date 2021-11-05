@@ -104,10 +104,12 @@ $ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --num_epoch
 ```
 
 Loading this profile in Nsight Systems will look like this:
+![NSYS Baseline](tutorial_images/nsys_baseline.png)
 
-The large gap between iterations is due to the data loading, which we will address in the next section.
+From this zoomed out view, we can see a lot idle gaps between iterations. These gaps are due to the data loading, which we will address in the next section.
 
-Beyond this, we can easily zoom into a single iteration and get an idea of where compute time is being spent:
+Beyond this, we can zoom into a single iteration and get an idea of where compute time is being spent:
+![NSYS Baseline zoomed](tutorial_images/nsys_baseline_zoomed.png)
 
 
 #### Using the benchy profiling tool
@@ -227,7 +229,7 @@ and zoomed in:
 With 8 data workers, the large gaps between steps are mostly alleviated, improving the throughput. Looking at the zoomed in profile, we
 still see that the H2D copy in of the input data takes some time and could be improved. One option here is to implement a prefetching
 mechanism in PyTorch directly using CUDA streams to concurrently load and copy in the next batch of input during the current batch, however
-this is left as an exercise outside of this tutorial. A good example of this can be found in [here]. (https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Classification/ConvNets/image_classification/dataloaders.py#L347)
+this is left as an exercise outside of this tutorial. A good example of this can be found in [here](https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Classification/ConvNets/image_classification/dataloaders.py#L347).
 
 Using benchy, we can also check how the various throughputs compare using 8 data workers. Running this configuration on Perlmutter
 using the tool yields the following:
