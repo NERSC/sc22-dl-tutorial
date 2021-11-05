@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-task 1
-#SBATCH --time=0:30:00
+#SBATCH --time=0:10:00
 #SBATCH --image=romerojosh/containers:sc21_tutorial
 #SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
@@ -23,8 +23,9 @@ hostname
 if [ "${ENABLE_PROFILING:-0}" -eq 1 ]; then
     echo "Enabling profiling..."
     NSYS_ARGS="--trace=cuda,cublas,nvtx --kill none -c cudaProfilerApi -f true"
-    PROFILE_OUTPUT=/logs/$SLURM_JOB_ID
-    export PROFILE_CMD="nsys profile $NSYS_ARGS -o $PROFILE_OUTPUT"
+    #PROFILE_OUTPUT=/logs/$SLURM_JOB_ID
+    NSYS_OUTPUT=${PROFILE_OUTPUT:-"profile"}
+    export PROFILE_CMD="nsys profile $NSYS_ARGS -o $NSYS_OUTPUT"
 fi
 
 set -x

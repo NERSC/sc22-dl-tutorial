@@ -23,6 +23,7 @@ def get_data_loader_distributed(params, world_rank, device=0):
                                   batch_size=params.batch_size,
                                   num_workers=params.num_data_workers,
                                   worker_init_fn=worker_init,
+                                  persistent_workers=True,
                                   pin_memory=torch.cuda.is_available())
     else:
         from benchy.torch import BenchmarkDataLoader
@@ -30,6 +31,7 @@ def get_data_loader_distributed(params, world_rank, device=0):
                                            batch_size=params.batch_size,
                                            num_workers=params.num_data_workers,
                                            worker_init_fn=worker_init,
+                                           persistent_workers=True,
                                            pin_memory=torch.cuda.is_available())
     val_loader = DataLoader(val_data,
                               batch_size=params.batch_size,
