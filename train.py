@@ -70,38 +70,8 @@ def train(params, args, local_rank, world_rank, world_size):
   # start training
   iters = 0
   startEpoch = 0
-  params.lr_schedule['tot_steps'] = params.num_epochs*len(train_data_loader)
+  params.lr_schedule['tot_steps'] = params.num_epochs*(params.Nsamples//params.batch_size)
 
-  if args.no_val:
-    if world_rank==0:
-      logging.info(model)
-      logging.info("Warming up 20 iters ...")
-    wstart = time.time()
-    for i, data in enumerate(train_data_loader, 0):
-      iters += 1
-      if iters>20:
-          break
-      inp, tar = map(lambda x: x.to(device), data)
-      tr_start = time.time()
-      b_size = inp.size(0)
-      
-      optimizer.zero_grad()
-      with autocast(params.enable_amp):
-        gen = model(inp)
-        loss = loss_func(gen, tar, lambda_rho)
-
-      if params.enable_amp:
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-      else:
-        loss.backward()
-        optimizer.step()
-    wend = time.time()
-
-    if world_rank==0:
-      logging.info("Warmup took {} seconds, avg {} iters/sec".format(wend-wstart, 20/(wend-wstart)))
-    
   if world_rank==0: 
     logging.info("Starting Training Loop...")
 
@@ -123,7 +93,7 @@ def train(params, args, local_rank, world_rank, world_size):
       tr_start = time.time()
       b_size = inp.size(0)
       
-      lr_schedule(optimizer, iters, nGPU=world_size, **params.lr_schedule)
+      lr_schedule(optimizer, iters, global_bs=params.batch_size, base_bs=params.base_batch_size, **params.lr_schedule)
       optimizer.zero_grad()
       with autocast(params.enable_amp):
         gen = model(inp)
@@ -154,15 +124,17 @@ def train(params, args, local_rank, world_rank, world_size):
     val_start = time.time()
     val_loss = []
     model.eval()
-    if not args.no_val and world_rank==0:
-      with torch.no_grad():
-        for i, data in enumerate(val_data_loader, 0):
-          with autocast(params.enable_amp):
-            inp, tar = map(lambda x: x.to(device), data)
-            gen = model(inp)
-            loss = loss_func(gen, tar, lambda_rho)
-            val_loss.append(loss.item())
-      val_end = time.time()
+    with torch.no_grad():
+      for i, data in enumerate(val_data_loader, 0):
+        with autocast(params.enable_amp):
+          inp, tar = map(lambda x: x.to(device), data)
+          gen = model(inp)
+          loss = loss_func(gen, tar, lambda_rho)
+          if params.distributed:
+            torch.distributed.all_reduce(loss)
+          val_loss.append(loss.item()/world_size)
+    val_end = time.time()
+    if world_rank==0:
       logging.info('  Avg val loss=%f'%np.mean(val_loss))
       logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
       args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
@@ -176,10 +148,9 @@ def train(params, args, local_rank, world_rank, world_size):
 if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--run_num", default='00', type=str)
-  parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str)
-  parser.add_argument("--config", default='base', type=str)
-  parser.add_argument("--no_val", action='store_true', help='skip validation steps (for profiling train only)')
+  parser.add_argument("--run_num", default='00', type=str, help='tag for indexing the current experiment')
+  parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str, help='path to yaml file containing training configs')
+  parser.add_argument("--config", default='base', type=str, help='name of desired config in yaml file')
   parser.add_argument("--enable_amp", action='store_true', help='enable automatic mixed precision')
   parser.add_argument("--enable_apex", action='store_true', help='enable apex fused Adam optimizer')
   parser.add_argument("--enable_jit", action='store_true', help='enable JIT compilation')
@@ -216,6 +187,7 @@ if __name__ == '__main__':
                                          init_method='env://')
     world_rank = torch.distributed.get_rank() 
     local_rank = int(os.environ['LOCAL_RANK'])
+  params.local_batch_size = params.batch_size//world_size
 
   # Set up directory
   baseDir = params.expdir

@@ -4,13 +4,13 @@ base: &base
   weight_init: {conv_init: 'normal', conv_scale: 0.02, conv_bias: 0.}
   lambda_rho: 1E-2 # weight for additional rho loss term
   full_scale: True # whether or not to use all 6 of the scales in U-Net
-  batch_size: 1
+  batch_size: 64 # number of samples per training batch (global batch size for distributed training)
+  base_batch_size: 64 # single GPU batch size
   num_epochs: 2
   enable_amp: False
   enable_apex: False
   enable_benchy: False
   enable_jit: False
-  ngpu: 1
   expdir: '/logs'
   # params for setting learning rate (cosine decay schedule):
   #   start_lr: initial learning rate
@@ -25,7 +25,7 @@ base: &base
   # Data
   data_loader_config: 'synthetic' # choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'
   box_size: [1024, 512] # total size of simulation boxes (train, validation)
-  data_size: 256 # size of crops for training
+  data_size: 64 # size of crops for training
   num_data_workers: 2 # number of dataloader worker threads per proc
   N_out_channels: 5
   # HDF5 files for PyTorch native dataloader
@@ -59,19 +59,39 @@ A100_crop64_sqrt: &crop64_A100
   lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
   lambda_rho: 0.
 
-
-#                       ----   CROP SIZE 96   ----
-
-
-A100_crop96_sqrt: &crop96_A100
+bs64: &bs64
   <<: *base
-  data_loader_config: 'lowmem'
-  data_size: 96
+  data_loader_config: 'dali-lowmem'
+  data_size: 64
   Nsamples: 4096
-  Nsamples_val: 256
+  Nsamples_val: 512
   num_epochs: 80
-  full_scale: False
   batch_size: 64
   lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
   lambda_rho: 0.
 
+bs256: # 4 GPUs
+  <<: *bs64
+  batch_size: 256
+
+bs256_2x:
+  <<: *bs64
+  batch_size: 256
+  num_epochs: 160
+
+bs512_4x: # 8 GPUs
+  <<: *bs64
+  batch_size: 512
+  num_epochs: 320
+
+bs2048_16x: # 32 GPUs
+  <<: *bs64
+  batch_size: 2048
+  Nsamples_val: 2048
+  num_epochs: 1280
+
+bs8192_64x: # 128 GPUs
+  <<: *bs64
+  batch_size: 8192
+  Nsamples_val: 8192
+  num_epochs: 5120

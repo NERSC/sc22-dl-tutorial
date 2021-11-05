@@ -237,10 +237,9 @@ def train(params, args, local_rank, world_rank, world_size):
 if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--run_num", default='00', type=str)
-  parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str)
-  parser.add_argument("--config", default='base', type=str)
-  parser.add_argument("--no_val", action='store_true', help='skip validation steps (for profiling train only)')
+  parser.add_argument("--run_num", default='00', type=str, help='tag for indexing the current experiment')
+  parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str, help='path to yaml file containing training configs')
+  parser.add_argument("--config", default='base', type=str, help='name of desired config in yaml file')
   parser.add_argument("--enable_amp", action='store_true', help='enable automatic mixed precision')
   parser.add_argument("--enable_apex", action='store_true', help='enable apex fused Adam optimizer')
   parser.add_argument("--enable_jit", action='store_true', help='enable JIT compilation')
