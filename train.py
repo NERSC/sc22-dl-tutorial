@@ -120,7 +120,7 @@ def train(params, args, local_rank, world_rank, world_size):
       if (args.enable_manual_profiling and world_rank==0):
           if (epoch == 1 and i == 0):
               torch.cuda.profiler.start()
-          if (epoch == 1 and i == 19):
+          if (epoch == 1 and i == 29):
               torch.cuda.profiler.stop()
 
       if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"step {i}")
@@ -208,6 +208,7 @@ if __name__ == '__main__':
                       help="dataloader configuration. choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'")
   parser.add_argument("--batch_size", default=None, type=int, help='per gpu batchsize')
   parser.add_argument("--num_epochs", default=None, type=int, help='number of epochs to run')
+  parser.add_argument("--num_data_workers", default=None, type=int, help='number of data workers for data loader')
   args = parser.parse_args()
 
   if (args.enable_benchy and args.enable_manual_profiling):
@@ -231,6 +232,9 @@ if __name__ == '__main__':
 
   if args.num_epochs:
       params.update({"num_epochs" : args.num_epochs})
+
+  if args.num_data_workers:
+      params.update({"num_data_workers" : args.num_data_workers})
 
   params.distributed = False
   if 'WORLD_SIZE' in os.environ:
