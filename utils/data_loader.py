@@ -18,8 +18,8 @@ def get_data_loader_distributed(params, world_rank, device=0):
     else:
         train_data, val_data = RandomCropDataset(params, validation=False), RandomCropDataset(params, validation=True)
 
-    train_sampler = DistributedSampler(train_data) if distributed else None
-    val_sampler = DistributedSampler(val_data) if distributed else None
+    train_sampler = DistributedSampler(train_data) if params.distributed else None
+    val_sampler = DistributedSampler(val_data) if params.distributed else None
 
     if not params.enable_benchy:
         train_loader = DataLoader(train_data,
