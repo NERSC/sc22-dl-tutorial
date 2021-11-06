@@ -1,18 +1,18 @@
 #!/bin/bash 
 #SBATCH -C gpu 
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node 1
-#SBATCH --cpus-per-task 32
+#SBATCH -A ntrain4
+#SBATCH --ntasks-per-node 8
+#SBATCH --cpus-per-task 10
 #SBATCH --gpus-per-task 1
-#SBATCH --time=0:10:00
+#SBATCH --time=0:30:00
 #SBATCH --image=romerojosh/containers:sc21_tutorial
-#SBATCH -J crop64-single
+#SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
 
-DATADIR=/pscratch/sd/j/joshr/nbody2hydro/datacopies
-LOGDIR=${SCRATCH}/ampUNet/logs
-
+DATADIR=/global/cscratch1/sd/sfarrell/sc21-dl-tutorial/data
+LOGDIR=${SCRATCH}/sc21-dl-tutorial/logs
 mkdir -p ${LOGDIR}
+args="${@}"
 
 hostname
 
@@ -27,13 +27,8 @@ if [ "${ENABLE_PROFILING:-0}" -eq 1 ]; then
 fi
 
 set -x
-srun -u shifter --module=gpu \
-    -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
+srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
     bash -c "
     source export_DDP_vars.sh
-    ${PROFILE_CMD} python train.py \
-        --config=A100_crop64_sqrt \
-        --data_loader_config=dali-lowmem \
-        --enable_benchy
+    ${PROFILE_CMD} python train.py --config=V100_crop64_sqrt ${args}
     "
-

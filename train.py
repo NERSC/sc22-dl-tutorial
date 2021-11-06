@@ -87,26 +87,43 @@ def train(params, args, local_rank, world_rank, world_size):
     model.train()
     step_count = 0
     for i, data in enumerate(train_data_loader, 0):
+      if (args.enable_manual_profiling and world_rank==0):
+          if (epoch == 1 and i == 0):
+              torch.cuda.profiler.start()
+          if (epoch == 1 and i == 29):
+              torch.cuda.profiler.stop()
+
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"step {i}")
       iters += 1
       dat_start = time.time()
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"data copy in {i}")
       inp, tar = map(lambda x: x.to(device), data)
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # copy in
       tr_start = time.time()
       b_size = inp.size(0)
       
       lr_schedule(optimizer, iters, global_bs=params.batch_size, base_bs=params.base_batch_size, **params.lr_schedule)
       optimizer.zero_grad()
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"forward")
       with autocast(params.enable_amp):
         gen = model(inp)
         loss = loss_func(gen, tar, lambda_rho)
         tr_loss.append(loss.item())
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() #forward
 
       if params.enable_amp:
         scaler.scale(loss).backward()
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"optimizer")
         scaler.step(optimizer)
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # optimizer
         scaler.update()
       else:
         loss.backward()
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"optimizer")
         optimizer.step()
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # optimizer
+
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # step
 
       tr_end = time.time()
       tr_time += tr_end - tr_start
@@ -115,7 +132,8 @@ def train(params, args, local_rank, world_rank, world_size):
 
     end = time.time()
     if world_rank==0:
-      logging.info('Time taken for epoch {} is {} sec, avg {} iters/sec'.format(epoch + 1, end-start, step_count/(end-start)))
+      logging.info('Time taken for epoch {} is {} sec, avg {} samples/sec'.format(epoch + 1, end-start,
+                                                                                  (step_count * params["batch_size"])/(end-start)))
       logging.info('  Avg train loss=%f'%np.mean(tr_loss))
       args.tboard_writer.add_scalar('Loss/train', np.mean(tr_loss), iters)
       args.tboard_writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], iters)
@@ -155,10 +173,17 @@ if __name__ == '__main__':
   parser.add_argument("--enable_apex", action='store_true', help='enable apex fused Adam optimizer')
   parser.add_argument("--enable_jit", action='store_true', help='enable JIT compilation')
   parser.add_argument("--enable_benchy", action='store_true', help='enable benchy tool usage')
+  parser.add_argument("--enable_manual_profiling", action='store_true', help='enable manual nvtx ranges and profiler start/stop calls')
   parser.add_argument("--data_loader_config", default=None, type=str,
                       choices=['synthetic', 'inmem', 'lowmem', 'dali-lowmem'],
                       help="dataloader configuration. choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'")
+  parser.add_argument("--batch_size", default=None, type=int, help='per gpu batchsize')
+  parser.add_argument("--num_epochs", default=None, type=int, help='number of epochs to run')
+  parser.add_argument("--num_data_workers", default=None, type=int, help='number of data workers for data loader')
   args = parser.parse_args()
+
+  if (args.enable_benchy and args.enable_manual_profiling):
+      raise "Enable either benchy profiling or manual profiling, not both."
   
   run_num = args.run_num
 
@@ -172,6 +197,15 @@ if __name__ == '__main__':
 
   if args.data_loader_config:
       params.update({"data_loader_config" : args.data_loader_config})
+
+  if args.batch_size:
+      params.update({"batch_size" : args.batch_size})
+
+  if args.num_epochs:
+      params.update({"num_epochs" : args.num_epochs})
+
+  if args.num_data_workers:
+      params.update({"num_data_workers" : args.num_data_workers})
 
   params.distributed = False
   if 'WORLD_SIZE' in os.environ:
