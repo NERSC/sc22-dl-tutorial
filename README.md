@@ -509,5 +509,100 @@ we do this weak scaling of the batch size and GPUs:
 These plots show ???% scaling efficiency with respect to ideal scaling at ??? GPUs.
 
 ## Multi-GPU performance profiling and optimization
+
+With distributed training enabled and large batch convergence tested, we are ready 
+to optimize the multi-GPU training throughput. We start with profiling the multi-GPU 
+training with Nsight Systems to understand the communication performance. 
+
 ### Profiling with Nsight Systems
+
+Using the optimized options for compute and I/O, we profile the communication baseline with 
+4 nodes on Perlmutter: 
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4node_baseline sbatch -n 4 ./submit_pm.sh --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --batch_size 16 --enable_manual_profiling
+```
+Considering both the case of strong scaling and large-batch training limitation, the 
+`batch_size` is set to 16 to show the effect of communication. The profile looks like: 
+![NSYS 4node_Baseline](tutorial_images/nsys_4node_baseline.png)
+where the stream 20 shows the NCCL communication calls. 
+
+By default, for our model there are 8 NCCL calls per iteration, as shown in zoomed-in view:
+![NSYS 4node_Baseline_zoomed](tutorial_images/nsys_4node_baseline_zoomed.png)
+
+The performance of this run:
+```
+2021-11-07 15:02:43,809 - root - INFO - Time taken for epoch 2 is 22.09706139564514 sec, avg 185.3640140949798 samples/sec
+2021-11-07 15:02:43,809 - root - INFO -   Avg train loss=0.009430
+2021-11-07 15:02:44,708 - root - INFO -   Avg val loss=0.010419
+2021-11-07 15:02:44,708 - root - INFO -   Total validation time: 0.8981976509094238 sec
+2021-11-07 15:02:57,993 - root - INFO - Time taken for epoch 3 is 13.282841444015503 sec, avg 308.36775529270705 samples/sec
+2021-11-07 15:02:57,993 - root - INFO -   Avg train loss=0.007341
+2021-11-07 15:02:58,804 - root - INFO -   Avg val loss=0.007486
+2021-11-07 15:02:58,804 - root - INFO -   Total validation time: 0.8099958896636963 sec
+2021-11-07 15:03:11,718 - root - INFO - Time taken for epoch 4 is 12.911744832992554 sec, avg 317.23055659632877 samples/sec
+2021-11-07 15:03:11,718 - root - INFO -   Avg train loss=0.006732
+2021-11-07 15:03:12,519 - root - INFO -   Avg val loss=0.006965
+2021-11-07 15:03:12,520 - root - INFO -   Total validation time: 0.8006300926208496 sec
+```
+Note this is the per node throughput, and the total throughput should multiply the number of nodes.  
+
 ### Adjusting DistributedDataParallel options
+
+The tunning [knobs](https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) 
+for `DistributedDataParallel` includes `broadcast_buffers`, `bucket_cap_mb`, etc. `broadcast_buffers` adds 
+additional communication (syncing buffers) and is enabled by default, which is often not necessary. `bucket_cap_mb` 
+sets a upper limit for the messsage size per NCCL call, adjusting which can change the total number of communication 
+calls per iteration. The proper bucket size depends on the overlap between communication and computation, and requires 
+tunning. 
+
+Since there is no batch norm layer in our model, it's safe to disable the `broadcast_buffers` with the added knob `--disable_broadcast_buffers`:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4node_nobroadcast sbatch -n 4 ./submit_pm.sh --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
+```
+The profile looks like:
+![NSYS 4node_nobroadcast](tutorial_images/nsys_4node_nobroadcast.png)
+The per step timing is slightly improved comparing to the baseline. 
+
+The performance of this run: 
+```
+2021-11-07 15:09:00,328 - root - INFO - Time taken for epoch 2 is 21.84688711166382 sec, avg 187.48666476210195 samples/sec
+2021-11-07 15:09:00,329 - root - INFO -   Avg train loss=0.009591
+2021-11-07 15:09:01,244 - root - INFO -   Avg val loss=0.009530
+2021-11-07 15:09:01,244 - root - INFO -   Total validation time: 0.9150736331939697 sec
+2021-11-07 15:09:13,795 - root - INFO - Time taken for epoch 3 is 12.547724962234497 sec, avg 326.4336772066595 samples/sec
+2021-11-07 15:09:13,795 - root - INFO -   Avg train loss=0.007226
+2021-11-07 15:09:14,602 - root - INFO -   Avg val loss=0.007689
+2021-11-07 15:09:14,603 - root - INFO -   Total validation time: 0.8070840835571289 sec
+2021-11-07 15:09:27,112 - root - INFO - Time taken for epoch 4 is 12.506241083145142 sec, avg 327.51647539565215 samples/sec
+2021-11-07 15:09:27,112 - root - INFO -   Avg train loss=0.006723
+2021-11-07 15:09:27,904 - root - INFO -   Avg val loss=0.007098
+2021-11-07 15:09:27,905 - root - INFO -   Total validation time: 0.7919814586639404 sec
+```
+Comparing to the baseline, there is about 4% improvement in `samples/sec`. 
+
+To show the effect of the message bucket size, we add another knob to the code, `--bucket_cap_mb`. The current 
+default value in PyTorch is 25 mb. We profile a run with 100 mb bucket size with following command:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4node_bucket100mb sbatch -n 4 ./submit_pm.sh --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100 
+```
+The profile looks like (zoomed in to a single iteration):
+![NSYS 4node_bucketcap100mb_zoomed](tutorial_images/nsys_4node_bucketcap100mb_zoomed.png)
+the total number of NCCL calls per step now reduced to 5. 
+
+The performance of this run:
+```
+2021-11-07 15:19:31,231 - root - INFO - Time taken for epoch 2 is 21.624991416931152 sec, avg 189.41047980222837 samples/sec
+2021-11-07 15:19:31,232 - root - INFO -   Avg train loss=0.009564
+2021-11-07 15:19:32,164 - root - INFO -   Avg val loss=0.009396
+2021-11-07 15:19:32,164 - root - INFO -   Total validation time: 0.9318954944610596 sec
+2021-11-07 15:19:44,955 - root - INFO - Time taken for epoch 3 is 12.788679599761963 sec, avg 320.2832605233334 samples/sec
+2021-11-07 15:19:44,956 - root - INFO -   Avg train loss=0.007284
+2021-11-07 15:19:45,771 - root - INFO -   Avg val loss=0.007850
+2021-11-07 15:19:45,771 - root - INFO -   Total validation time: 0.8148813247680664 sec
+2021-11-07 15:19:58,261 - root - INFO - Time taken for epoch 4 is 12.486505508422852 sec, avg 328.0341323068345 samples/sec
+2021-11-07 15:19:58,261 - root - INFO -   Avg train loss=0.006772
+2021-11-07 15:19:59,050 - root - INFO -   Avg val loss=0.007171
+2021-11-07 15:19:59,051 - root - INFO -   Total validation time: 0.7889487743377686 sec
+```
+
+### Weak and Strong Throughput Scaling 
