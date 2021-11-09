@@ -30,8 +30,8 @@ fi
 
 BENCHY_CONFIG=benchy-conf.yaml
 BENCHY_OUTPUT=${BENCHY_OUTPUT:-"benchy_output"}
-sed "s/.*output_filename.*/        output_filename: ${BENCHY_OUTPUT}.json/" ${BENCHY_CONFIG} > benchy-run.yaml
-export BENCHY_CONFIG_FILE=benchy-run.yaml
+sed "s/.*output_filename.*/        output_filename: ${BENCHY_OUTPUT}.json/" ${BENCHY_CONFIG} > benchy-run-${SLURM_JOBID}.yaml
+export BENCHY_CONFIG_FILE=benchy-run-${SLURM_JOBID}.yaml
 
 set -x
 srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
@@ -39,4 +39,4 @@ srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
     source export_DDP_vars.sh
     ${PROFILE_CMD} python train.py --config=A100_crop64_sqrt ${args}
     "
-rm benchy-run.yaml
+rm benchy-run-${SLURM_JOBID}.yaml
