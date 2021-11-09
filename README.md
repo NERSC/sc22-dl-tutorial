@@ -119,7 +119,7 @@ $ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f t
 ```
 This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file `baseline.qdrep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
 
-Loading this profile [(baseline.qdrep)](sample_nsys_files/baseline.qdrep) in Nsight Systems will look like this:
+Loading this profile ([baseline.qdrep](sample_nsys_files/baseline.qdrep)) in Nsight Systems will look like this:
 ![NSYS Baseline](tutorial_images/nsys_baseline.png)
 
 From this zoomed out view, we can see a lot idle gaps between iterations. These gaps are due to the data loading, which we will address in the next section.
@@ -222,7 +222,7 @@ This is the performance of the training script for the first three epochs on a 4
 Increasing the number of workers to 8 improves performance to around 270 samples per second, while increasing to 16 workers causes a slight reduction from this.
 
 We can run the 8 worker configuration through profiler using the instructions in the previous section with the added `--num_data_workers`
-argument and load that profile in Nsight Systems. This is what this profile [(8workers.qdrep)](sample_nsys_files/8workers.qdrep) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([8workers.qdrep](sample_nsys_files/8workers.qdrep)) looks like:
 ![NSYS Native Data](tutorial_images/nsys_nativedata_8workers.png)
 
 and zoomed in:
@@ -282,7 +282,7 @@ This is the performance of the training script for the first three epochs on a 4
 ```
 
 We can run the DALI case through profiler using the instructions in the earlier section with the added `--data_loader_config=dali-lowmem`
-argument and load that profile in Nsight Systems. This is what this profile [(dali.qdrep)](sample_nsys_files/dali.qdrep) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([dali.qdrep](sample_nsys_files/dali.qdrep)) looks like:
 ![NSYS DALI](tutorial_images/nsys_dali.png)
 
 and zoomed in to a single iteration:
@@ -360,7 +360,7 @@ This is the performance of the training script for the first three epochs on a 4
 ```
 
 We can run the case with AMP enabled through profiler using the instructions in the earlier section with the added `--data_loader_config=enable_amp`
-argument and load that profile in Nsight Systems. This is what this profile [(dali_amp.qdrep)](sample_nsys_files/dali_amp.qdrep) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([dali_amp.qdrep](sample_nsys_files/dali_amp.qdrep)) looks like:
 ![NSYS DALI AMP](tutorial_images/nsys_dali_amp.png)
 
 and zoomed in to a single iteration:
@@ -437,7 +437,7 @@ This is the performance of the training script for the first three epochs on a 4
 2021-11-09 20:23:03,665 - root - INFO -   Total validation time: 0.7198197841644287 sec
 ```
 
-Running a profile [(dali_amp_apex_jit.qdrep)](sample_nsys_files/dali_amp_apex_jit.qdrep) using these new options and loading in Nsight Systems looks like this:
+Running a profile ([dali_amp_apex_jit.qdrep](sample_nsys_files/dali_amp_apex_jit.qdrep)) using these new options and loading in Nsight Systems looks like this:
 ![NSYS DALI AMP APEX JIT](tutorial_images/nsys_dali_amp_apex_jit.png)
 
 and zoomed in to a single iteration:
