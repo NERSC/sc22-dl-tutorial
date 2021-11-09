@@ -177,9 +177,18 @@ def train(params, args, local_rank, world_rank, world_size):
     model.train()
     step_count = 0
     for i, data in enumerate(train_data_loader, 0):
+      if (args.enable_manual_profiling and world_rank==0):
+          if (epoch == 1 and i == 0):
+              torch.cuda.profiler.start()
+          if (epoch == 1 and i == 29):
+              torch.cuda.profiler.stop()
+
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"step {i}")
       iters += 1
       dat_start = time.time()
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"data copy in {i}")
       inp, tar = map(lambda x: x.to(device), data)
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # copy in
       tr_start = time.time()
       b_size = inp.size(0)
       
@@ -190,12 +199,17 @@ def train(params, args, local_rank, world_rank, world_size):
       graph.replay()
 
       if params.enable_amp:
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"optimizer")
         scaler.step(optimizer)
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # optimizer
         scaler.update()
       else:
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"optimizer")
         optimizer.step()
+        if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # optimizer
 
       tr_loss.append(static_loss.item())
+      if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # step
 
       tr_end = time.time()
       tr_time += tr_end - tr_start
@@ -204,9 +218,8 @@ def train(params, args, local_rank, world_rank, world_size):
 
     end = time.time()
     if world_rank==0:
-      logging.info('Time taken for epoch {} is {} sec, avg {} iters/sec'.format(epoch + 1, end-start, step_count/(end-start)))
-      logging.info('  Step breakdown:')
-      logging.info('  Data to GPU: %.2f ms, U-Net fwd/back/optim: %.2f ms'%(1e3*dat_time/step_count, 1e3*tr_time/step_count))
+      logging.info('Time taken for epoch {} is {} sec, avg {} samples/sec'.format(epoch + 1, end-start,
+                                                                                  (step_count * params["batch_size"])/(end-start)))
       logging.info('  Avg train loss=%f'%np.mean(tr_loss))
       args.tboard_writer.add_scalar('Loss/train', np.mean(tr_loss), iters)
       args.tboard_writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], iters)
@@ -215,7 +228,7 @@ def train(params, args, local_rank, world_rank, world_size):
     val_start = time.time()
     val_loss = []
     model.eval()
-    if not args.no_val and world_rank==0:
+    if not args.enable_benchy and world_rank==0:
       with torch.no_grad():
         for i, data in enumerate(val_data_loader, 0):
           with autocast(params.enable_amp):
@@ -255,7 +268,7 @@ if __name__ == '__main__':
 
   if (args.enable_benchy and args.enable_manual_profiling):
       raise "Enable either benchy profiling or manual profiling, not both."
-
+  
   run_num = args.run_num
 
   params = YParams(os.path.abspath(args.yaml_config), args.config)
@@ -300,8 +313,8 @@ if __name__ == '__main__':
 
   # Set up directory
   baseDir = params.expdir
-  expDir = os.path.join(baseDir, args.config+'/'+str(run_num)+'/')
-  if world_rank==0:
+  expDir = os.path.join(baseDir, args.config+'/%dGPU/'%(world_size)+str(run_num)+'/')
+  if  world_rank==0:
     if not os.path.isdir(expDir):
       os.makedirs(expDir)
     logging_utils.log_to_file(logger_name=None, log_filename=os.path.join(expDir, 'out.log'))
