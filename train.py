@@ -142,21 +142,22 @@ def train(params, args, local_rank, world_rank, world_size):
     val_start = time.time()
     val_loss = []
     model.eval()
-    with torch.no_grad():
-      for i, data in enumerate(val_data_loader, 0):
-        with autocast(params.enable_amp):
-          inp, tar = map(lambda x: x.to(device), data)
-          gen = model(inp)
-          loss = loss_func(gen, tar, lambda_rho)
-          if params.distributed:
-            torch.distributed.all_reduce(loss)
-          val_loss.append(loss.item()/world_size)
-    val_end = time.time()
-    if world_rank==0:
-      logging.info('  Avg val loss=%f'%np.mean(val_loss))
-      logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
-      args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
-      args.tboard_writer.flush()
+    if not args.enable_benchy:
+      with torch.no_grad():
+        for i, data in enumerate(val_data_loader, 0):
+          with autocast(params.enable_amp):
+            inp, tar = map(lambda x: x.to(device), data)
+            gen = model(inp)
+            loss = loss_func(gen, tar, lambda_rho)
+            if params.distributed:
+              torch.distributed.all_reduce(loss)
+            val_loss.append(loss.item()/world_size)
+      val_end = time.time()
+      if world_rank==0:
+        logging.info('  Avg val loss=%f'%np.mean(val_loss))
+        logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
+        args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
+    args.tboard_writer.flush()
 
   t2 = time.time()
   tottime = t2 - t1

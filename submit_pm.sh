@@ -28,9 +28,15 @@ if [ "${ENABLE_PROFILING:-0}" -eq 1 ]; then
     export PROFILE_CMD="nsys profile $NSYS_ARGS -o $NSYS_OUTPUT"
 fi
 
+BENCHY_CONFIG=benchy-conf.yaml
+BENCHY_OUTPUT=${BENCHY_OUTPUT:-"benchy_output"}
+sed "s/.*output_filename.*/        output_filename: ${BENCHY_OUTPUT}.json/" ${BENCHY_CONFIG} > benchy-run-${SLURM_JOBID}.yaml
+export BENCHY_CONFIG_FILE=benchy-run-${SLURM_JOBID}.yaml
+
 set -x
 srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
     bash -c "
     source export_DDP_vars.sh
     ${PROFILE_CMD} python train.py --config=A100_crop64_sqrt ${args}
     "
+rm benchy-run-${SLURM_JOBID}.yaml

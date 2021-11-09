@@ -32,7 +32,7 @@ def get_data_loader_distributed(params, world_rank, device=0):
     else:
         from benchy.torch import BenchmarkDataLoader
         train_loader = BenchmarkDataLoader(train_data,
-                                           batch_size=params.localbatch_size,
+                                           batch_size=params.local_batch_size,
                                            num_workers=params.num_data_workers,
                                            sampler=train_sampler,
                                            worker_init_fn=worker_init,
