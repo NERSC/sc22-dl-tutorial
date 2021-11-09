@@ -310,17 +310,67 @@ In general, we now see that the `IO` throughput is greater than the `SYNTHETIC`,
 throughput.
 
 ### Enabling Mixed Precision Training
-As a first step to improve the compute performance of this training script, we can enable automatic mixed precision (AMP) in PyTorch. AMP provides a simple way for users to convert existing FP32 training scripts to mixed FP32/FP16 precision, unlocking
-faster computation with Tensor Cores on NVIDIA GPUs. The AMP module in torch is composed of two main parts: `torch.cuda.amp.GradScaler` and `torch.cuda.amp.autocast`. `torch.cuda.amp.GradScaler` handles automatic loss scaling to control the range of FP16 gradients.
-The `torch.cuda.amp.autocast` context manager handles converting model operations to FP16 where appropriate. Search `train.py` for comments labeled `# AMP:` to see where we've added code to enable AMP in this script.
+Now that the data loading performance is faster than the synthetic compute throughput, we can start looking at improving compute performance. As a first step to improve the compute performance of this training script, we can enable automatic mixed precision (AMP) in PyTorch. AMP provides a simple way for users to convert existing FP32 training scripts to mixed FP32/FP16 precision, unlocking
+faster computation with Tensor Cores on NVIDIA GPUs.
 
-To run the script on a single GPU with AMP enabled, use the following command:
+The AMP module in torch is composed of two main parts: `torch.cuda.amp.GradScaler` and `torch.cuda.amp.autocast`. `torch.cuda.amp.GradScaler` handles automatic loss scaling to control the range of FP16 gradients.
+The `torch.cuda.amp.autocast` context manager handles converting model operations to FP16 where appropriate.
+
+As a quick note, the A100 GPUs we've been using to report results thus far have been able to benefit from Tensor Core compute via the use of TF32 precision operations, enabled by default for CUDNN and CUBLAS in PyTorch. We can measure the benefit of TF32 precision usage on the A100 GPU by temporarily disabling it via setting the environment variable `NVIDIA_TF32_OVERRIDE=0`.  
+Running this experiment on Perlmutter using the following command:
 ```
-$ python ...
+$ NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --num_epochs 3 --data_loader_config=dali-lowmem
 ```
-With AMP enabled, this is the performance of the baseline using the ??? container for the first two epochs on a 40GB A100 card:
+yields the following result for 3 epochs:
 ```
-...
+2021-11-05 21:57:38,257 - root - INFO - Starting Training Loop...
+2021-11-05 22:00:45,021 - root - INFO - Time taken for epoch 1 is 186.76425051689148 sec, avg 21.93139205529886 samples/sec
+2021-11-05 22:00:45,021 - root - INFO -   Avg train loss=0.066032
+2021-11-05 22:00:46,913 - root - INFO -   Avg val loss=0.042661
+2021-11-05 22:00:46,913 - root - INFO -   Total validation time: 1.891629695892334 sec
+2021-11-05 22:01:16,234 - root - INFO - Time taken for epoch 2 is 29.31784439086914 sec, avg 139.7101350764954 samples/sec
+2021-11-05 22:01:16,234 - root - INFO -   Avg train loss=0.028867
+2021-11-05 22:01:17,951 - root - INFO -   Avg val loss=0.028121
+2021-11-05 22:01:17,951 - root - INFO -   Total validation time: 1.7168924808502197 sec
+2021-11-05 22:01:47,251 - root - INFO - Time taken for epoch 3 is 29.29676342010498 sec, avg 139.81066581536135 samples/sec
+2021-11-05 22:01:47,251 - root - INFO -   Avg train loss=0.021764
+2021-11-05 22:01:48,969 - root - INFO -   Avg val loss=0.026560
+2021-11-05 22:01:48,969 - root - INFO -   Total validation time: 1.7180349826812744 sec
+```
+From here, we can see that running in FP32 without TF32 acceleration is much slower and we are already seeing great performance from
+TF32 Tensor Core operations without any code changes to add AMP. With that said, AMP can still be a useful improvement for A100 GPUs,
+as TF32 is a compute type only, leaving all data in full precision FP32. FP16 precision has the compute benefits of Tensor Cores combined with a reduction in storage and memory bandwidth requirements. 
+
+We can experiment with AMP by launching the script as follows:
+* If running on a 40GB A100 card:
+```
+$ python train.py --config=A100_crop64_sqrt --num_epochs 3 --data_loader_config=dali-lowmem --enable_amp
+```
+* If running on a 16GB V100 card:
+```
+$ python train.py --config=V100_crop64_sqrt --num_epochs 3 --data_loader_config=dali-lowmem --enable_amp
+
+```
+* If running on Perlmutter in the batch queue:
+```
+$ sbatch -n 1 ./submit_pm.sh --num_epochs 3 --data_loader_config=dali-lowmem --enable_amp
+```
+
+This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP:
+```
+2021-11-05 22:18:13,097 - root - INFO - Starting Training Loop...
+2021-11-05 22:21:15,144 - root - INFO - Time taken for epoch 1 is 182.04708886146545 sec, avg 22.49967316487539 samples/sec
+2021-11-05 22:21:15,145 - root - INFO -   Avg train loss=0.069134
+2021-11-05 22:21:16,586 - root - INFO -   Avg val loss=0.044405
+2021-11-05 22:21:16,587 - root - INFO -   Total validation time: 1.4404635429382324 sec
+2021-11-05 22:21:25,233 - root - INFO - Time taken for epoch 2 is 8.643362045288086 sec, avg 473.88967146562226 samples/sec
+2021-11-05 22:21:25,233 - root - INFO -   Avg train loss=0.030345
+2021-11-05 22:21:26,241 - root - INFO -   Avg val loss=0.028605
+2021-11-05 22:21:26,242 - root - INFO -   Total validation time: 1.008251428604126 sec
+2021-11-05 22:21:34,171 - root - INFO - Time taken for epoch 3 is 7.926817178726196 sec, avg 516.7269419298262 samples/sec
+2021-11-05 22:21:34,171 - root - INFO -   Avg train loss=0.022549
+2021-11-05 22:21:34,988 - root - INFO -   Avg val loss=0.025905
+2021-11-05 22:21:34,988 - root - INFO -   Total validation time: 0.8163356781005859 sec
 ```
 
 You can run another profile (using `--config=???`) with Nsight Systems. Loading this profile and zooming into a single iteration, this is what we see:

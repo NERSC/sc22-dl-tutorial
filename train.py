@@ -172,7 +172,7 @@ def train(params, args, local_rank, world_rank, world_size):
     val_start = time.time()
     val_loss = []
     model.eval()
-    if not args.no_val and world_rank==0:
+    if not args.enable_benchy and world_rank==0:
       with torch.no_grad():
         for i, data in enumerate(val_data_loader, 0):
           with autocast(params.enable_amp):
