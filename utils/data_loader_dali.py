@@ -34,7 +34,7 @@ class DaliDataLoader(object):
 
         # since we aren't using DistributedSampler with DALI to reduce the number of samples per rank,
         # we manually adjust the length of the DALI pipeline when running distributed training
-        self.num_samples = num_samples//(params.batch_size//params.local_batch_size)
+        self.num_samples = num_samples//(params.global_batch_size//params.local_batch_size)
         self.num_batches = self.num_samples//params.local_batch_size
 
         # construct master object

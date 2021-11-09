@@ -25,8 +25,8 @@ import apex.optimizers as aoptim
 
 def capture_model(params, model, loss_func, lambda_rho, scaler, capture_stream, device, num_warmup=20):
   print("Capturing Model")
-  inp_shape = (params.batch_size, 4, params.data_size, params.data_size, params.data_size)
-  tar_shape = (params.batch_size, 5, params.data_size, params.data_size, params.data_size)
+  inp_shape = (params.local_batch_size, 4, params.data_size, params.data_size, params.data_size)
+  tar_shape = (params.local_batch_size, 5, params.data_size, params.data_size, params.data_size)
   static_input = torch.zeros(inp_shape, dtype=torch.float32, device=device)
   static_label = torch.zeros(tar_shape, dtype=torch.float32, device=device)
 
@@ -244,11 +244,18 @@ if __name__ == '__main__':
   parser.add_argument("--enable_apex", action='store_true', help='enable apex fused Adam optimizer')
   parser.add_argument("--enable_jit", action='store_true', help='enable JIT compilation')
   parser.add_argument("--enable_benchy", action='store_true', help='enable benchy tool usage')
+  parser.add_argument("--enable_manual_profiling", action='store_true', help='enable manual nvtx ranges and profiler start/stop calls')
   parser.add_argument("--data_loader_config", default=None, type=str,
                       choices=['synthetic', 'inmem', 'lowmem', 'dali-lowmem'],
                       help="dataloader configuration. choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'")
+  parser.add_argument("--local_batch_size", default=None, type=int, help='local batchsize (manually override global_batch_size config setting)')
+  parser.add_argument("--num_epochs", default=None, type=int, help='number of epochs to run')
+  parser.add_argument("--num_data_workers", default=None, type=int, help='number of data workers for data loader')
   args = parser.parse_args()
-  
+
+  if (args.enable_benchy and args.enable_manual_profiling):
+      raise "Enable either benchy profiling or manual profiling, not both."
+
   run_num = args.run_num
 
   params = YParams(os.path.abspath(args.yaml_config), args.config)
@@ -262,6 +269,12 @@ if __name__ == '__main__':
   if args.data_loader_config:
       params.update({"data_loader_config" : args.data_loader_config})
 
+  if args.num_epochs:
+      params.update({"num_epochs" : args.num_epochs})
+
+  if args.num_data_workers:
+      params.update({"num_data_workers" : args.num_data_workers})
+
   params.distributed = False
   if 'WORLD_SIZE' in os.environ:
     params.distributed = int(os.environ['WORLD_SIZE']) > 1
@@ -274,8 +287,16 @@ if __name__ == '__main__':
   if params.distributed:
     torch.distributed.init_process_group(backend='nccl',
                                          init_method='env://')
-    world_rank = torch.distributed.get_rank() 
+    world_rank = torch.distributed.get_rank()
     local_rank = int(os.environ['LOCAL_RANK'])
+
+  if args.local_batch_size:
+      # Manually override batch size
+      params.local_batch_size = args.local_batch_size
+      params.update({"global_batch_size" : world_size*args.local_batch_size})
+  else:
+      # Compute local batch size based on number of ranks
+      params.local_batch_size = params.global_batch_size//world_size
 
   # Set up directory
   baseDir = params.expdir
