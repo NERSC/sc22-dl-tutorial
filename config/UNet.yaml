@@ -80,7 +80,8 @@ bs2048_opt: # 32 GPUs
   global_batch_size: 2048
   num_epochs: 160
 
+# Warning: training may be unstable
 bs8192_opt: # 128 GPUs
   <<: *bs64_opt
   global_batch_size: 8192
-  num_epochs: 640
+  num_epochs: 320
