@@ -511,8 +511,33 @@ These plots show ???% scaling efficiency with respect to ideal scaling at ??? GP
 ## Multi-GPU performance profiling and optimization
 
 With distributed training enabled and large batch convergence tested, we are ready 
-to optimize the multi-GPU training throughput. We start with profiling the multi-GPU 
-training with Nsight Systems to understand the communication performance. 
+to optimize the multi-GPU training throughput. We start with understanding and ploting
+the performance of our application as we scale. Then we can go in more details and profile 
+the multi-GPU training with Nsight Systems to understand the communication performance. 
+
+### Weak and Strong Throughput Scaling
+
+First we want to measure the scaling efficiency while this might change as we increase the scale. The following plot was generated with this command:
+```BENCHY_OUTPUT=weak_scale -N 32 ./submit_pm.sh --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit --enable_benchy --batch_size 64```
+
+<img src="tutorial_images/scale_perfEff.png" width="500">
+
+The plot shows the throughput as we scale up to 32 nodes. The solid green line shows the real data throughput, while the dotted green line shows the ideal throughput, i.e. if we multiply the single GPU throughput by the number of GPUs used. For example for 32 nodes we get around 78% scaling efficiency. The blue lines show the data throughput by running the data-loader in isolation. The orange lines show the throughput for synthetic data.
+
+Next we can further break the performance of the applications, but make the communication between work switched off. The following plot was generated with this command, by adding the noddp flag:
+```BENCHY_OUTPUT=weak_scale_noddp sbatch -N 32 ./submit_pm.sh --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit --enable_benchy --batch_size 64 --noddp```
+
+<img src="tutorial_images/scale_perfComm.png" width="500">
+
+The orange line is with synthetic data, so no I/O overhead, and the orange dotted line is with synthetic data but having the communication between work switched off. That effectively makes the dotted orange line the compute of the application. By comparing it with the solid orange line we can get the communication overhead. For example in this case for 32 nodes the communication overhead is around 25%.
+
+The first thing we can do to improve communication is to make sure that we are using the compute capabilities of our GPU. Because Pytorch is optimizing the overlap between communication and compute, a better compute will lead to a higher overlap and so better throughput. In the following plot we increased the batch size from 64 to 128 and we can see the scaling efficiency increased to around 89% for 32 nodes.
+
+<img src="tutorial_images/scale_perfEff_bs128.png" width="500">
+
+Also to understand better the reason for this improvement we can look at the following plot of the communication overhead. The blue lines are with batch size of 128 and the orange lines with batch size 64. The difference between the solid and dotted lines is smaller for larger batch size as expected. For example for 32 nodes we see an improvement in the communication overhead from 25% for batch size 64, to 12% for batch size 128.
+
+<img src="tutorial_images/scale_perfDiffBS.png" width="500">
 
 ### Profiling with Nsight Systems
 
@@ -646,4 +671,3 @@ and the performance of the run:
 Note that the batch size is set to a small value to tune the knobs at smaller scale. To have a better scaliing efficiency, we
  want to increase the per GPU compute intensity by increasing the per GPU batch size, which will be discussed in the following section. 
 
-### Weak and Strong Throughput Scaling 
