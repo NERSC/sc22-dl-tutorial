@@ -38,7 +38,7 @@ def train(params, args, local_rank, world_rank, world_size):
   
   if params.enable_amp:
     scaler = GradScaler()
-  if params.distributed:
+  if params.distributed and not args.noddp:
     if args.disable_broadcast_buffers: 
       model = DistributedDataParallel(model, device_ids=[local_rank],
                                     bucket_cap_mb=args.bucket_cap_mb,
@@ -62,7 +62,7 @@ def train(params, args, local_rank, world_rank, world_size):
     #torch._C._jit_set_profiling_executor(True)
     #torch._C._jit_set_profiling_mode(True)
     #torch._C._jit_set_bailout_depth(20)
-    model_handle = model.module if params.distributed else model
+    model_handle = model.module if (params.distributed and not args.noddp) else model
     model_handle = torch.jit.script(model_handle)  
 
   # select loss function
@@ -190,6 +190,7 @@ if __name__ == '__main__':
   parser.add_argument("--num_data_workers", default=None, type=int, help='number of data workers for data loader')
   parser.add_argument("--bucket_cap_mb", default=25, type=int, help='max message bucket size in mb')
   parser.add_argument("--disable_broadcast_buffers", action='store_true', help='disable syncing broadcasting buffers')
+  parser.add_argument("--noddp", action='store_true', help='disable DDP communication')
   args = parser.parse_args()
 
   if (args.enable_benchy and args.enable_manual_profiling):
