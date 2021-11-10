@@ -62,7 +62,7 @@ First, let us look at the performance of the trianing script without optimizatio
 
 On Perlmutter for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --num_epochs 3
+$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3
 ```
 `submit_pm.sh` is a batch submission script that defines resources to be requested by SLURM as well as the command to run.
 Note that any arguments for `train.py`, such as the desired config (`--config`), can be added after `submit_pm.sh` when submitting, and they will be passed to `train.py` properly.
@@ -111,7 +111,7 @@ We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.
 
 To generate a profile using our scripts on Perlmutter, run the following command: 
 ```
-$ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --num_epochs 2 --enable_manual_profiling
+$ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --config=A100_crop64_sqrt --num_epochs 2 --enable_manual_profiling
 ```
 If running interactively, this is the full command from the batch submission script:
 ```
@@ -133,7 +133,7 @@ As an alternative to manually specifying NVTX ranges, we've included the use of 
 
 To run using using benchy on Perlmutter, use the following command: 
 ```
-$  sbatch -n1 submit_pm.sh --enable_benchy
+$  sbatch -n1 submit_pm.sh --config=A100_crop64_sqrt --enable_benchy
 ```
 If running interactively:
 ```
@@ -164,7 +164,7 @@ of workers improves performance.
 
 We can run this experiment on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --num_epochs 3 --num_data_workers <value of your choice>
+$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers <value of your choice>
 ```
 If running interactively:
 ```
@@ -258,7 +258,7 @@ argument `--data_loader_config=dali-lowmem` to the training script.
 
 We can run this experiment on Perlmutter using DALI with 4 worker threads by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 If running interactively:
 ```
@@ -313,7 +313,7 @@ The `torch.cuda.amp.autocast` context manager handles converting model operation
 As a quick note, the A100 GPUs we've been using to report results thus far have been able to benefit from Tensor Core compute via the use of TF32 precision operations, enabled by default for CUDNN and CUBLAS in PyTorch. We can measure the benefit of TF32 precision usage on the A100 GPU by temporarily disabling it via setting the environment variable `NVIDIA_TF32_OVERRIDE=0`.  
 We can run this experiment on Perlmutter by running the following command:
 ```
-$ NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+$ NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 yields the following result for 3 epochs:
 ```
@@ -336,7 +336,7 @@ as TF32 is a compute type only, leaving all data in full precision FP32. FP16 pr
 
 We can run this experiment using AMP on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
+$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
 ```
 If running interactively:
 ```
@@ -386,7 +386,7 @@ reuse. We can enabled the use of the `FusedAdam` optimizer in our training scrip
 
 We can run this experiment using APEX on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
+$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
 ```
 If running interactively:
 ```
@@ -414,7 +414,7 @@ JIT compilation, done in our training script via the flag `--enable_jit`.
 
 We can run this experiment using JIT on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
+$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
 ```
 If running interactively:
 ```
