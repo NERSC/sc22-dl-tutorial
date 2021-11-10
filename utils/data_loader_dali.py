@@ -21,7 +21,7 @@ def get_data_loader_distributed(params, world_rank, device_id = 0):
                                   num_workers=params.num_data_workers, device_id=device_id, validation=False)
     if params.enable_benchy:
         from benchy.torch import BenchmarkGenericIteratorWrapper
-        train_loader = BenchmarkGenericIteratorWrapper(train_loader, params.batch_size)
+        train_loader = BenchmarkGenericIteratorWrapper(train_loader, params.local_batch_size)
     validation_loader = DaliDataLoader(params, params.val_path_npy_data, params.val_path_npy_label, params.Nsamples_val,
                                        num_workers=params.num_data_workers, device_id=device_id, validation=True)
     return train_loader, validation_loader
@@ -32,8 +32,13 @@ class DaliDataLoader(object):
     """Random crops"""
     def get_pipeline(self, params, data_file, label_file, num_samples, num_workers, device_id, validation):
 
+        # since we aren't using DistributedSampler with DALI to reduce the number of samples per rank,
+        # we manually adjust the length of the DALI pipeline when running distributed training
+        self.num_samples = num_samples//(params.global_batch_size//params.local_batch_size)
+        self.num_batches = self.num_samples//params.local_batch_size
+
         # construct master object
-        pipeline = Pipeline(batch_size = params.batch_size,
+        pipeline = Pipeline(batch_size = params.local_batch_size,
                             num_threads = num_workers,
                             device_id = device_id)
 
@@ -48,13 +53,13 @@ class DaliDataLoader(object):
         length = params.box_size[0] if not validation else params.box_size[1]
 
         with pipeline:
-            rstart, rend = fn.external_source(source = lambda x: get_crop_coords(self.rng, length, params.data_size, params.batch_size),
+            rstart, rend = fn.external_source(source = lambda x: get_crop_coords(self.rng, length, params.data_size, params.local_batch_size),
                                               num_outputs = 2,
                                               no_copy = False)
             
             data = fn.readers.numpy(device = 'cpu',
                                     name = "data_input",
-                                    files = [data_file] * num_samples,
+                                    files = [data_file] * self.num_samples,
                                     cache_header_information = True,
                                     roi_start = rstart,
                                     roi_end = rend,
@@ -62,7 +67,7 @@ class DaliDataLoader(object):
 
             label = fn.readers.numpy(device = 'cpu',
                                      name = "label_input",
-                                     files = [label_file] * num_samples,
+                                     files = [label_file] * self.num_samples,
                                      cache_header_information = True,
                                      roi_start = rstart,
                                      roi_end = rend,
@@ -72,7 +77,7 @@ class DaliDataLoader(object):
             data, label = data.gpu(), label.gpu()
 
             # get random numbers
-            axes, angles = fn.external_source(source = lambda x: get_isomorphism_axes_angle(self.rng, params.batch_size),
+            axes, angles = fn.external_source(source = lambda x: get_isomorphism_axes_angle(self.rng, params.local_batch_size),
                                               device = "cpu",
                                               num_outputs = 2,
                                               no_copy = False,
@@ -122,7 +127,7 @@ class DaliDataLoader(object):
     def __init__(self, params, data_file, label_file, num_samples, num_workers=1, device_id=0, validation=False):
 
         # extract relevant parameters
-        self.batch_size = params.batch_size
+        self.batch_size = params.local_batch_size
         self.size = params.data_size
 
         # RNG
@@ -144,12 +149,9 @@ class DaliDataLoader(object):
                                             last_batch_policy = LastBatchPolicy.PARTIAL,
                                             auto_reset = True,
                                             prepare_first_batch = True)
-
-        self.Nsamples = num_samples//params.batch_size
-
         
     def __len__(self):
-        return self.Nsamples
+        return self.num_batches
         
     def __iter__(self):
         for token in self.iterator:
