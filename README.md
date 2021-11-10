@@ -517,34 +517,33 @@ training with Nsight Systems to understand the communication performance.
 ### Profiling with Nsight Systems
 
 Using the optimized options for compute and I/O, we profile the communication baseline with 
-4 nodes on Perlmutter: 
+4 GPUs (1 node) on Perlmutter: 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=4node_baseline sbatch -n 4 ./submit_pm.sh --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --batch_size 16 --enable_manual_profiling
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_baseline sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling
 ```
 Considering both the case of strong scaling and large-batch training limitation, the 
-`batch_size` is set to 16 to show the effect of communication. The profile looks like: 
-![NSYS 4node_Baseline](tutorial_images/nsys_4node_baseline.png)
+`local_batch_size`, i.e. per GPU batch size, is set to 16 to show the effect of communication. The profile looks like: 
+![NSYS 4gpu_Baseline](tutorial_images/nsys_4gpu_baseline.png)
 where the stream 20 shows the NCCL communication calls. 
 
 By default, for our model there are 8 NCCL calls per iteration, as shown in zoomed-in view:
-![NSYS 4node_Baseline_zoomed](tutorial_images/nsys_4node_baseline_zoomed.png)
+![NSYS 4gpu_Baseline_zoomed](tutorial_images/nsys_4gpu_baseline_zoomed.png)
 
 The performance of this run:
 ```
-2021-11-07 15:02:43,809 - root - INFO - Time taken for epoch 2 is 22.09706139564514 sec, avg 185.3640140949798 samples/sec
-2021-11-07 15:02:43,809 - root - INFO -   Avg train loss=0.009430
-2021-11-07 15:02:44,708 - root - INFO -   Avg val loss=0.010419
-2021-11-07 15:02:44,708 - root - INFO -   Total validation time: 0.8981976509094238 sec
-2021-11-07 15:02:57,993 - root - INFO - Time taken for epoch 3 is 13.282841444015503 sec, avg 308.36775529270705 samples/sec
-2021-11-07 15:02:57,993 - root - INFO -   Avg train loss=0.007341
-2021-11-07 15:02:58,804 - root - INFO -   Avg val loss=0.007486
-2021-11-07 15:02:58,804 - root - INFO -   Total validation time: 0.8099958896636963 sec
-2021-11-07 15:03:11,718 - root - INFO - Time taken for epoch 4 is 12.911744832992554 sec, avg 317.23055659632877 samples/sec
-2021-11-07 15:03:11,718 - root - INFO -   Avg train loss=0.006732
-2021-11-07 15:03:12,519 - root - INFO -   Avg val loss=0.006965
-2021-11-07 15:03:12,520 - root - INFO -   Total validation time: 0.8006300926208496 sec
+2021-11-10 04:03:37,792 - root - INFO - Time taken for epoch 2 is 61.7418851852417 sec, avg 1061.4512304471264 samples/sec
+2021-11-10 04:03:37,792 - root - INFO -   Avg train loss=0.006371
+2021-11-10 04:03:41,047 - root - INFO -   Avg val loss=0.006337
+2021-11-10 04:03:41,048 - root - INFO -   Total validation time: 3.254544973373413 sec
+2021-11-10 04:04:32,869 - root - INFO - Time taken for epoch 3 is 51.81808805465698 sec, avg 1264.7321130581577 samples/sec
+2021-11-10 04:04:32,869 - root - INFO -   Avg train loss=0.005793
+2021-11-10 04:04:36,134 - root - INFO -   Avg val loss=0.005889
+2021-11-10 04:04:36,134 - root - INFO -   Total validation time: 3.2647454738616943 sec
+2021-11-10 04:05:27,672 - root - INFO - Time taken for epoch 4 is 51.53450584411621 sec, avg 1271.6916350810875 samples/sec
+2021-11-10 04:05:27,672 - root - INFO -   Avg train loss=0.005587
+2021-11-10 04:05:30,891 - root - INFO -   Avg val loss=0.005936
+2021-11-10 04:05:30,891 - root - INFO -   Total validation time: 3.2182624340057373 sec
 ```
-Note this is the per node throughput, and the total throughput should multiply the number of nodes.  
 
 ### Adjusting DistributedDataParallel options
 
@@ -557,52 +556,94 @@ tunning.
 
 Since there is no batch norm layer in our model, it's safe to disable the `broadcast_buffers` with the added knob `--disable_broadcast_buffers`:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=4node_nobroadcast sbatch -n 4 ./submit_pm.sh --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_nobroadcast sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
 ```
 The profile looks like:
-![NSYS 4node_nobroadcast](tutorial_images/nsys_4node_nobroadcast.png)
+![NSYS 4gpu_nobroadcast](tutorial_images/nsys_4gpu_nobroadcast.png)
 The per step timing is slightly improved comparing to the baseline. 
 
 The performance of this run: 
 ```
-2021-11-07 15:09:00,328 - root - INFO - Time taken for epoch 2 is 21.84688711166382 sec, avg 187.48666476210195 samples/sec
-2021-11-07 15:09:00,329 - root - INFO -   Avg train loss=0.009591
-2021-11-07 15:09:01,244 - root - INFO -   Avg val loss=0.009530
-2021-11-07 15:09:01,244 - root - INFO -   Total validation time: 0.9150736331939697 sec
-2021-11-07 15:09:13,795 - root - INFO - Time taken for epoch 3 is 12.547724962234497 sec, avg 326.4336772066595 samples/sec
-2021-11-07 15:09:13,795 - root - INFO -   Avg train loss=0.007226
-2021-11-07 15:09:14,602 - root - INFO -   Avg val loss=0.007689
-2021-11-07 15:09:14,603 - root - INFO -   Total validation time: 0.8070840835571289 sec
-2021-11-07 15:09:27,112 - root - INFO - Time taken for epoch 4 is 12.506241083145142 sec, avg 327.51647539565215 samples/sec
-2021-11-07 15:09:27,112 - root - INFO -   Avg train loss=0.006723
-2021-11-07 15:09:27,904 - root - INFO -   Avg val loss=0.007098
-2021-11-07 15:09:27,905 - root - INFO -   Total validation time: 0.7919814586639404 sec
+2021-11-10 04:12:07,932 - root - INFO - Time taken for epoch 2 is 62.6831419467926 sec, avg 1045.5123652804289 samples/sec
+2021-11-10 04:12:07,932 - root - INFO -   Avg train loss=0.006372
+2021-11-10 04:12:11,173 - root - INFO -   Avg val loss=0.006370
+2021-11-10 04:12:11,173 - root - INFO -   Total validation time: 3.2399580478668213 sec
+2021-11-10 04:13:01,406 - root - INFO - Time taken for epoch 3 is 50.23048114776611 sec, avg 1304.705798202663 samples/sec
+2021-11-10 04:13:01,406 - root - INFO -   Avg train loss=0.005815
+2021-11-10 04:13:04,636 - root - INFO -   Avg val loss=0.005902
+2021-11-10 04:13:04,636 - root - INFO -   Total validation time: 3.22876238822937 sec
+2021-11-10 04:13:54,472 - root - INFO - Time taken for epoch 4 is 49.83389210700989 sec, avg 1315.088933035222 samples/sec
+2021-11-10 04:13:54,473 - root - INFO -   Avg train loss=0.005614
+2021-11-10 04:13:57,722 - root - INFO -   Avg val loss=0.005941
+2021-11-10 04:13:57,723 - root - INFO -   Total validation time: 3.2491915225982666 sec
 ```
-Comparing to the baseline, there is about 4% improvement in `samples/sec`. 
+Comparing to the baseline, there are few percentages (performance may slightly vary run by run) improvement in `samples/sec`. 
 
 To show the effect of the message bucket size, we add another knob to the code, `--bucket_cap_mb`. The current 
 default value in PyTorch is 25 mb. We profile a run with 100 mb bucket size with following command:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=4node_bucket100mb sbatch -n 4 ./submit_pm.sh --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100 
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_bucket100mb sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
 ```
 The profile looks like (zoomed in to a single iteration):
-![NSYS 4node_bucketcap100mb_zoomed](tutorial_images/nsys_4node_bucketcap100mb_zoomed.png)
+![NSYS 4gpu_bucketcap100mb_zoomed](tutorial_images/nsys_4gpu_bucketcap100mb_zoomed.png)
 the total number of NCCL calls per step now reduced to 5. 
 
 The performance of this run:
 ```
-2021-11-07 15:19:31,231 - root - INFO - Time taken for epoch 2 is 21.624991416931152 sec, avg 189.41047980222837 samples/sec
-2021-11-07 15:19:31,232 - root - INFO -   Avg train loss=0.009564
-2021-11-07 15:19:32,164 - root - INFO -   Avg val loss=0.009396
-2021-11-07 15:19:32,164 - root - INFO -   Total validation time: 0.9318954944610596 sec
-2021-11-07 15:19:44,955 - root - INFO - Time taken for epoch 3 is 12.788679599761963 sec, avg 320.2832605233334 samples/sec
-2021-11-07 15:19:44,956 - root - INFO -   Avg train loss=0.007284
-2021-11-07 15:19:45,771 - root - INFO -   Avg val loss=0.007850
-2021-11-07 15:19:45,771 - root - INFO -   Total validation time: 0.8148813247680664 sec
-2021-11-07 15:19:58,261 - root - INFO - Time taken for epoch 4 is 12.486505508422852 sec, avg 328.0341323068345 samples/sec
-2021-11-07 15:19:58,261 - root - INFO -   Avg train loss=0.006772
-2021-11-07 15:19:59,050 - root - INFO -   Avg val loss=0.007171
-2021-11-07 15:19:59,051 - root - INFO -   Total validation time: 0.7889487743377686 sec
+2021-11-10 04:19:48,472 - root - INFO - Time taken for epoch 2 is 59.066428899765015 sec, avg 1109.5304256706254 samples/sec
+2021-11-10 04:19:48,472 - root - INFO -   Avg train loss=0.006478
+2021-11-10 04:19:51,711 - root - INFO -   Avg val loss=0.006588
+2021-11-10 04:19:51,712 - root - INFO -   Total validation time: 3.239215612411499 sec
+2021-11-10 04:20:41,475 - root - INFO - Time taken for epoch 3 is 49.75986886024475 sec, avg 1317.0452716437817 samples/sec
+2021-11-10 04:20:41,475 - root - INFO -   Avg train loss=0.005917
+2021-11-10 04:20:44,730 - root - INFO -   Avg val loss=0.006044
+2021-11-10 04:20:44,730 - root - INFO -   Total validation time: 3.2542178630828857 sec
+2021-11-10 04:21:34,517 - root - INFO - Time taken for epoch 4 is 49.78394103050232 sec, avg 1316.4084370067546 samples/sec
+2021-11-10 04:21:34,517 - root - INFO -   Avg train loss=0.005700
+2021-11-10 04:21:37,772 - root - INFO -   Avg val loss=0.006073
+2021-11-10 04:21:37,773 - root - INFO -   Total validation time: 3.2548396587371826 sec
 ```
+Similarly, to understand the cross node performance, we run the baseline and optimized options with 2 nodes on Perlmutter. 
+
+Baseline:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_baseline sbatch -N 2 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling 
+```
+and the performance of the run: 
+```
+2021-11-10 02:41:30,680 - root - INFO - Time taken for epoch 2 is 44.45261096954346 sec, avg 1474.2891040731388 samples/sec
+2021-11-10 02:41:30,710 - root - INFO -   Avg train loss=0.007586
+2021-11-10 02:41:32,457 - root - INFO -   Avg val loss=0.007256
+2021-11-10 02:41:32,457 - root - INFO -   Total validation time: 1.7458698749542236 sec
+2021-11-10 02:42:08,002 - root - INFO - Time taken for epoch 3 is 35.54009485244751 sec, avg 1844.0018315113414 samples/sec
+2021-11-10 02:42:08,028 - root - INFO -   Avg train loss=0.006422
+2021-11-10 02:42:09,688 - root - INFO -   Avg val loss=0.006547
+2021-11-10 02:42:09,688 - root - INFO -   Total validation time: 1.6595783233642578 sec
+2021-11-10 02:42:45,635 - root - INFO - Time taken for epoch 4 is 35.94469451904297 sec, avg 1823.245429594067 samples/sec
+2021-11-10 02:42:45,644 - root - INFO -   Avg train loss=0.006166
+2021-11-10 02:42:47,310 - root - INFO -   Avg val loss=0.006547
+2021-11-10 02:42:47,310 - root - INFO -   Total validation time: 1.6650199890136719 sec
+```
+Optimized:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_bucket100mb sbatch -N 2 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
+```
+and the performance of the run:
+```
+2021-11-10 02:41:28,509 - root - INFO - Time taken for epoch 2 is 43.84619975090027 sec, avg 1494.67913689953 samples/sec
+2021-11-10 02:41:28,528 - root - INFO -   Avg train loss=0.007528
+2021-11-10 02:41:30,271 - root - INFO -   Avg val loss=0.007238
+2021-11-10 02:41:30,272 - root - INFO -   Total validation time: 1.742598056793213 sec
+2021-11-10 02:42:05,129 - root - INFO - Time taken for epoch 3 is 34.85356664657593 sec, avg 1880.3240616534827 samples/sec
+2021-11-10 02:42:05,136 - root - INFO -   Avg train loss=0.006444
+2021-11-10 02:42:06,803 - root - INFO -   Avg val loss=0.006532
+2021-11-10 02:42:06,804 - root - INFO -   Total validation time: 1.6663029193878174 sec
+2021-11-10 02:42:42,100 - root - INFO - Time taken for epoch 4 is 35.293962717056274 sec, avg 1856.8614843673777 samples/sec
+2021-11-10 02:42:42,123 - root - INFO -   Avg train loss=0.006195
+2021-11-10 02:42:43,763 - root - INFO -   Avg val loss=0.006568
+2021-11-10 02:42:43,786 - root - INFO -   Total validation time: 1.6387364864349365 sec
+```
+Note that the batch size is set to a small value to tune the knobs at smaller scale. To have a better scaliing efficiency, we
+ want to increase the per GPU compute intensity by increasing the per GPU batch size, which will be discussed in the following section. 
 
 ### Weak and Strong Throughput Scaling 

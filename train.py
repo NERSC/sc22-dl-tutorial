@@ -97,7 +97,7 @@ def train(params, args, local_rank, world_rank, world_size):
       if (args.enable_manual_profiling and world_rank==0):
           if (epoch == 1 and i == 0):
               torch.cuda.profiler.start()
-          if (epoch == 1 and i == 29):
+          if (epoch == 1 and i == 59):
               torch.cuda.profiler.stop()
 
       if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"step {i}")
