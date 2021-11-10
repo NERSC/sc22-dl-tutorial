@@ -184,7 +184,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   if (args.enable_benchy and args.enable_manual_profiling):
-      raise "Enable either benchy profiling or manual profiling, not both."
+      raise RuntimeError("Enable either benchy profiling or manual profiling, not both.")
   
   run_num = args.run_num
 
@@ -217,7 +217,7 @@ if __name__ == '__main__':
   if params.distributed:
     torch.distributed.init_process_group(backend='nccl',
                                          init_method='env://')
-    world_rank = torch.distributed.get_rank() 
+    world_rank = torch.distributed.get_rank()
     local_rank = int(os.environ['LOCAL_RANK'])
 
   if args.local_batch_size:
@@ -227,7 +227,6 @@ if __name__ == '__main__':
   else:
       # Compute local batch size based on number of ranks
       params.local_batch_size = params.global_batch_size//world_size
-
 
   # Set up directory
   baseDir = params.expdir
