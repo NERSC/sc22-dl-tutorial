@@ -12,15 +12,15 @@ def get_data_loader_distributed(params, world_rank, device_id=0):
 
     return get_data_loader_distributed(params, world_rank, device_id)
 
-def lr_schedule(optimizer, iternum, nGPU=1, scaling='none', start_lr=1e-4, tot_steps=1000, end_lr=0., warmup_steps=0):
+def lr_schedule(optimizer, iternum, global_bs, base_bs, scaling='none', start_lr=1e-4, tot_steps=1000, end_lr=0., warmup_steps=0):
     if scaling=='sqrt':
-        init_lr = np.sqrt(nGPU)*start_lr
+        init_lr = np.sqrt(global_bs/base_bs)*start_lr
     elif scaling=='linear':
-        init_lr = nGPU*start_lr
+        init_lr = (global_bs/base_bs)*start_lr
     elif scaling=='none':
         init_lr = start_lr
 
-    if nGPU > 1 and scaling != 'none':
+    if global_bs > base_bs and scaling != 'none':
         # warm-up lr rate
         if iternum<warmup_steps:
             lr = (iternum/warmup_steps)*init_lr

@@ -37,6 +37,6 @@ set -x
 srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
     bash -c "
     source export_DDP_vars.sh
-    ${PROFILE_CMD} python train.py --config=A100_crop64_sqrt ${args}
+    ${PROFILE_CMD} python train.py ${args}
     "
 rm benchy-run-${SLURM_JOBID}.yaml

@@ -70,38 +70,8 @@ def train(params, args, local_rank, world_rank, world_size):
   # start training
   iters = 0
   startEpoch = 0
-  params.lr_schedule['tot_steps'] = params.num_epochs*len(train_data_loader)
+  params.lr_schedule['tot_steps'] = params.num_epochs*(params.Nsamples//params.global_batch_size)
 
-  if args.no_val:
-    if world_rank==0:
-      logging.info(model)
-      logging.info("Warming up 20 iters ...")
-    wstart = time.time()
-    for i, data in enumerate(train_data_loader, 0):
-      iters += 1
-      if iters>20:
-          break
-      inp, tar = map(lambda x: x.to(device), data)
-      tr_start = time.time()
-      b_size = inp.size(0)
-      
-      optimizer.zero_grad()
-      with autocast(params.enable_amp):
-        gen = model(inp)
-        loss = loss_func(gen, tar, lambda_rho)
-
-      if params.enable_amp:
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-      else:
-        loss.backward()
-        optimizer.step()
-    wend = time.time()
-
-    if world_rank==0:
-      logging.info("Warmup took {} seconds, avg {} iters/sec".format(wend-wstart, 20/(wend-wstart)))
-    
   if world_rank==0: 
     logging.info("Starting Training Loop...")
 
@@ -132,7 +102,7 @@ def train(params, args, local_rank, world_rank, world_size):
       tr_start = time.time()
       b_size = inp.size(0)
       
-      lr_schedule(optimizer, iters, nGPU=world_size, **params.lr_schedule)
+      lr_schedule(optimizer, iters, global_bs=params.global_batch_size, base_bs=params.base_batch_size, **params.lr_schedule)
       optimizer.zero_grad()
       if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"forward")
       with autocast(params.enable_amp):
@@ -163,7 +133,7 @@ def train(params, args, local_rank, world_rank, world_size):
     end = time.time()
     if world_rank==0:
       logging.info('Time taken for epoch {} is {} sec, avg {} samples/sec'.format(epoch + 1, end-start,
-                                                                                  (step_count * params["batch_size"])/(end-start)))
+                                                                                  (step_count * params["global_batch_size"])/(end-start)))
       logging.info('  Avg train loss=%f'%np.mean(tr_loss))
       args.tboard_writer.add_scalar('Loss/train', np.mean(tr_loss), iters)
       args.tboard_writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], iters)
@@ -172,19 +142,22 @@ def train(params, args, local_rank, world_rank, world_size):
     val_start = time.time()
     val_loss = []
     model.eval()
-    if not args.enable_benchy and world_rank==0:
+    if not args.enable_benchy:
       with torch.no_grad():
         for i, data in enumerate(val_data_loader, 0):
           with autocast(params.enable_amp):
             inp, tar = map(lambda x: x.to(device), data)
             gen = model(inp)
             loss = loss_func(gen, tar, lambda_rho)
-            val_loss.append(loss.item())
+            if params.distributed:
+              torch.distributed.all_reduce(loss)
+            val_loss.append(loss.item()/world_size)
       val_end = time.time()
-      logging.info('  Avg val loss=%f'%np.mean(val_loss))
-      logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
-      args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
-      args.tboard_writer.flush()
+      if world_rank==0:
+        logging.info('  Avg val loss=%f'%np.mean(val_loss))
+        logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
+        args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
+        args.tboard_writer.flush()
 
   t2 = time.time()
   tottime = t2 - t1
@@ -194,10 +167,9 @@ def train(params, args, local_rank, world_rank, world_size):
 if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--run_num", default='00', type=str)
-  parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str)
-  parser.add_argument("--config", default='base', type=str)
-  parser.add_argument("--no_val", action='store_true', help='skip validation steps (for profiling train only)')
+  parser.add_argument("--run_num", default='00', type=str, help='tag for indexing the current experiment')
+  parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str, help='path to yaml file containing training configs')
+  parser.add_argument("--config", default='base', type=str, help='name of desired config in yaml file')
   parser.add_argument("--enable_amp", action='store_true', help='enable automatic mixed precision')
   parser.add_argument("--enable_apex", action='store_true', help='enable apex fused Adam optimizer')
   parser.add_argument("--enable_jit", action='store_true', help='enable JIT compilation')
@@ -206,7 +178,7 @@ if __name__ == '__main__':
   parser.add_argument("--data_loader_config", default=None, type=str,
                       choices=['synthetic', 'inmem', 'lowmem', 'dali-lowmem'],
                       help="dataloader configuration. choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'")
-  parser.add_argument("--batch_size", default=None, type=int, help='per gpu batchsize')
+  parser.add_argument("--local_batch_size", default=None, type=int, help='local batchsize (manually override global_batch_size config setting)')
   parser.add_argument("--num_epochs", default=None, type=int, help='number of epochs to run')
   parser.add_argument("--num_data_workers", default=None, type=int, help='number of data workers for data loader')
   args = parser.parse_args()
@@ -226,9 +198,6 @@ if __name__ == '__main__':
 
   if args.data_loader_config:
       params.update({"data_loader_config" : args.data_loader_config})
-
-  if args.batch_size:
-      params.update({"batch_size" : args.batch_size})
 
   if args.num_epochs:
       params.update({"num_epochs" : args.num_epochs})
@@ -250,6 +219,15 @@ if __name__ == '__main__':
                                          init_method='env://')
     world_rank = torch.distributed.get_rank() 
     local_rank = int(os.environ['LOCAL_RANK'])
+
+  if args.local_batch_size:
+      # Manually override batch size
+      params.local_batch_size = args.local_batch_size
+      params.update({"global_batch_size" : world_size*args.local_batch_size})
+  else:
+      # Compute local batch size based on number of ranks
+      params.local_batch_size = params.global_batch_size//world_size
+
 
   # Set up directory
   baseDir = params.expdir

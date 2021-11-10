@@ -2,4 +2,4 @@ __pycache__/
 *.out
 *.slr
 ./joblogs
-
+.ipynb_checkpoints/
