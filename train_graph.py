@@ -133,35 +133,8 @@ def train(params, args, local_rank, world_rank, world_size):
   # start training
   iters = 0
   startEpoch = 0
-  params.lr_schedule['tot_steps'] = params.num_epochs*len(train_data_loader)
+  params.lr_schedule['tot_steps'] = params.num_epochs*(params.Nsamples//params.global_batch_size)
 
-  if args.no_val:
-    if world_rank==0:
-      logging.info(model)
-      logging.info("Warming up 20 iters ...")
-    wstart = time.time()
-    for i, data in enumerate(train_data_loader, 0):
-      iters += 1
-      if iters>20:
-          break
-      inp, tar = map(lambda x: x.to(device), data)
-      tr_start = time.time()
-      b_size = inp.size(0)
-      
-      static_input.copy_(inp)
-      static_label.copy_(tar)
-      graph.replay()
-
-      if params.enable_amp:
-        scaler.step(optimizer)
-        scaler.update()
-      else:
-        optimizer.step()
-    wend = time.time()
-
-    if world_rank==0:
-      logging.info("Warmup took {} seconds, avg {} iters/sec".format(wend-wstart, 20/(wend-wstart)))
-    
   if world_rank==0: 
     logging.info("Starting Training Loop...")
 
@@ -192,7 +165,7 @@ def train(params, args, local_rank, world_rank, world_size):
       tr_start = time.time()
       b_size = inp.size(0)
       
-      lr_schedule(optimizer, iters, nGPU=world_size, **params.lr_schedule)
+      lr_schedule(optimizer, iters, global_bs=params.global_batch_size, base_bs=params.base_batch_size, **params.lr_schedule)
 
       static_input.copy_(inp)
       static_label.copy_(tar)
@@ -219,7 +192,7 @@ def train(params, args, local_rank, world_rank, world_size):
     end = time.time()
     if world_rank==0:
       logging.info('Time taken for epoch {} is {} sec, avg {} samples/sec'.format(epoch + 1, end-start,
-                                                                                  (step_count * params["batch_size"])/(end-start)))
+                                                                                  (step_count * params["global_batch_size"])/(end-start)))
       logging.info('  Avg train loss=%f'%np.mean(tr_loss))
       args.tboard_writer.add_scalar('Loss/train', np.mean(tr_loss), iters)
       args.tboard_writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], iters)
@@ -228,19 +201,22 @@ def train(params, args, local_rank, world_rank, world_size):
     val_start = time.time()
     val_loss = []
     model.eval()
-    if not args.enable_benchy and world_rank==0:
+    if not args.enable_benchy:
       with torch.no_grad():
         for i, data in enumerate(val_data_loader, 0):
           with autocast(params.enable_amp):
             inp, tar = map(lambda x: x.to(device), data)
             gen = model(inp)
             loss = loss_func(gen, tar, lambda_rho)
-            val_loss.append(loss.item())
+            if params.distributed:
+              torch.distributed.all_reduce(loss)
+            val_loss.append(loss.item()/world_size)
       val_end = time.time()
-      logging.info('  Avg val loss=%f'%np.mean(val_loss))
-      logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
-      args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
-      args.tboard_writer.flush()
+      if world_rank==0:
+        logging.info('  Avg val loss=%f'%np.mean(val_loss))
+        logging.info('  Total validation time: {} sec'.format(val_end - val_start)) 
+        args.tboard_writer.add_scalar('Loss/valid', np.mean(val_loss), iters)
+        args.tboard_writer.flush()
 
   t2 = time.time()
   tottime = t2 - t1
@@ -267,7 +243,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   if (args.enable_benchy and args.enable_manual_profiling):
-      raise "Enable either benchy profiling or manual profiling, not both."
+      raise RuntimeError("Enable either benchy profiling or manual profiling, not both.")
   
   run_num = args.run_num
 
