@@ -38,8 +38,15 @@ def train(params, args, local_rank, world_rank, world_size):
   
   if params.enable_amp:
     scaler = GradScaler()
-  if params.distributed:
-    model = DistributedDataParallel(model, device_ids=[local_rank])
+  if params.distributed and not args.noddp:
+    if args.disable_broadcast_buffers: 
+      model = DistributedDataParallel(model, device_ids=[local_rank],
+                                    bucket_cap_mb=args.bucket_cap_mb,
+                                    broadcast_buffers=False,
+                                    gradient_as_bucket_view=True)
+    else:
+      model = DistributedDataParallel(model, device_ids=[local_rank],
+                                    bucket_cap_mb=args.bucket_cap_mb)
 
   if params.enable_apex:
     optimizer = aoptim.FusedAdam(model.parameters(), lr = params.lr_schedule['start_lr'],
@@ -55,7 +62,7 @@ def train(params, args, local_rank, world_rank, world_size):
     #torch._C._jit_set_profiling_executor(True)
     #torch._C._jit_set_profiling_mode(True)
     #torch._C._jit_set_bailout_depth(20)
-    model_handle = model.module if params.distributed else model
+    model_handle = model.module if (params.distributed and not args.noddp) else model
     model_handle = torch.jit.script(model_handle)  
 
   # select loss function
@@ -90,7 +97,7 @@ def train(params, args, local_rank, world_rank, world_size):
       if (args.enable_manual_profiling and world_rank==0):
           if (epoch == 1 and i == 0):
               torch.cuda.profiler.start()
-          if (epoch == 1 and i == 29):
+          if (epoch == 1 and i == 59):
               torch.cuda.profiler.stop()
 
       if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"step {i}")
@@ -181,10 +188,13 @@ if __name__ == '__main__':
   parser.add_argument("--local_batch_size", default=None, type=int, help='local batchsize (manually override global_batch_size config setting)')
   parser.add_argument("--num_epochs", default=None, type=int, help='number of epochs to run')
   parser.add_argument("--num_data_workers", default=None, type=int, help='number of data workers for data loader')
+  parser.add_argument("--bucket_cap_mb", default=25, type=int, help='max message bucket size in mb')
+  parser.add_argument("--disable_broadcast_buffers", action='store_true', help='disable syncing broadcasting buffers')
+  parser.add_argument("--noddp", action='store_true', help='disable DDP communication')
   args = parser.parse_args()
 
   if (args.enable_benchy and args.enable_manual_profiling):
-      raise "Enable either benchy profiling or manual profiling, not both."
+      raise RuntimeError("Enable either benchy profiling or manual profiling, not both.")
   
   run_num = args.run_num
 
@@ -217,7 +227,7 @@ if __name__ == '__main__':
   if params.distributed:
     torch.distributed.init_process_group(backend='nccl',
                                          init_method='env://')
-    world_rank = torch.distributed.get_rank() 
+    world_rank = torch.distributed.get_rank()
     local_rank = int(os.environ['LOCAL_RANK'])
 
   if args.local_batch_size:
@@ -227,7 +237,6 @@ if __name__ == '__main__':
   else:
       # Compute local batch size based on number of ranks
       params.local_batch_size = params.global_batch_size//world_size
-
 
   # Set up directory
   baseDir = params.expdir

@@ -70,6 +70,10 @@ bs256_opt: # 4 GPUs
   global_batch_size: 256
   num_epochs: 20
 
+bs512_test: # 8 GPUs
+  <<: *bs64_opt
+  global_batch_size: 512
+
 bs512_opt: # 8 GPUs
   <<: *bs64_opt
   global_batch_size: 512
