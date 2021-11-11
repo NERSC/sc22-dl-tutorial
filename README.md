@@ -150,13 +150,13 @@ As an alternative to manually specifying NVTX ranges, we've included the use of 
 
 To run using using benchy on Perlmutter, use the following command: 
 ```
-$ sbatch -n1 submit_pm.sh --config=short --enable_benchy
+$ sbatch -n1 submit_pm.sh --config=short --num_epochs 10 --enable_benchy
 ```
 If running interactively:
 ```
-$ python train.py --config=short --enable_benchy
+$ python train.py --config=short ---num_epochs 10 -enable_benchy
 ```
-benchy uses epoch boundaries to separate the test trials it runs, so in these cases we are not limiting the number of epochs to 2.
+benchy uses epoch boundaries to separate the test trials it runs, so in these cases we increase the epoch limit to 10 to ensure the full experiment runs.
 
 benchy will report throughput measurements directly to the terminal, including a simple summary of averages at the end of the job. For this case on Perlmutter, the summary output from benchy is:
 ```
