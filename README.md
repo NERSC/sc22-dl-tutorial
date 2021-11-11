@@ -67,7 +67,7 @@ First, let us look at the performance of the training script without optimizatio
 
 On Perlmutter for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3
+$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3
 ```
 `submit_pm.sh` is a batch submission script that defines resources to be requested by SLURM as well as the command to run.
 Note that any arguments for `train.py`, such as the desired config (`--config`), can be added after `submit_pm.sh` when submitting, and they will be passed to `train.py` properly.
@@ -76,9 +76,9 @@ directory. You can find the job id of your job using the command `squeue --me` a
 
 For interactive jobs, you can run the Python script directly using the following command:
 ```
-$ python train.py --config=A100_crop64_sqrt --num_epochs 3
+$ python train.py --config=short --num_epochs 3
 ```
-For V100 systems, replace the `--config=A100_crop64_sqrt` with `--config=V100_crop64_sqrt`, otherwise, instructions are the same.
+For V100 systems, you will likely need to update the config to reduce the local batch size to 32 due to the reduced memory capacity. Otherwise, instructions are the same.
 
 This will run 3 epochs of training on a single GPU using a default batch size of 64 (or 32 if using the V100 configuration).
 See [`config/UNet.yaml`](config/UNet.yaml) for specific configuration details.
@@ -116,11 +116,11 @@ We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.
 
 To generate a profile using our scripts on Perlmutter, run the following command: 
 ```
-$ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --config=A100_crop64_sqrt --num_epochs 2 --enable_manual_profiling
+$ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --config=short --num_epochs 2 --enable_manual_profiling
 ```
 If running interactively, this is the full command from the batch submission script:
 ```
-$ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=A100_crop64_sqrt --num_epochs 2 --enable_manual_profiling
+$ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=short --num_epochs 2 --enable_manual_profiling
 ```
 This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file `baseline.qdrep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
 
@@ -138,11 +138,11 @@ As an alternative to manually specifying NVTX ranges, we've included the use of 
 
 To run using using benchy on Perlmutter, use the following command: 
 ```
-$  sbatch -n1 submit_pm.sh --config=A100_crop64_sqrt --enable_benchy
+$ sbatch -n1 submit_pm.sh --config=short --enable_benchy
 ```
 If running interactively:
 ```
-$ python train.py --config=A100_crop64_sqrt --enable_benchy
+$ python train.py --config=short --enable_benchy
 ```
 benchy uses epoch boundaries to separate the test trials it runs, so in these cases we are not limiting the number of epochs to 2.
 
@@ -169,11 +169,11 @@ of workers improves performance.
 
 We can run this experiment on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers <value of your choice>
+$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers <value of your choice>
 ```
 If running interactively:
 ```
-$ python train.py --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers <value of your choice>
+$ python train.py --config=short --num_epochs 3 --num_data_workers <value of your choice>
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and 4 data workers:
@@ -263,11 +263,11 @@ argument `--data_loader_config=dali-lowmem` to the training script.
 
 We can run this experiment on Perlmutter using DALI with 4 worker threads by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 If running interactively:
 ```
-$ python train.py --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and DALI:
@@ -318,7 +318,7 @@ The `torch.cuda.amp.autocast` context manager handles converting model operation
 As a quick note, the A100 GPUs we've been using to report results thus far have been able to benefit from Tensor Core compute via the use of TF32 precision operations, enabled by default for CUDNN and CUBLAS in PyTorch. We can measure the benefit of TF32 precision usage on the A100 GPU by temporarily disabling it via setting the environment variable `NVIDIA_TF32_OVERRIDE=0`.  
 We can run this experiment on Perlmutter by running the following command:
 ```
-$ NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+$ NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 yields the following result for 3 epochs:
 ```
@@ -341,11 +341,11 @@ as TF32 is a compute type only, leaving all data in full precision FP32. FP16 pr
 
 We can run this experiment using AMP on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
+$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
 ```
 If running interactively:
 ```
-$ python train.py --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
+$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP:
@@ -391,11 +391,11 @@ reuse. We can enabled the use of the `FusedAdam` optimizer in our training scrip
 
 We can run this experiment using APEX on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
+$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
 ```
 If running interactively:
 ```
-$ python train.py --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
+$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP, and APEX:
@@ -419,11 +419,11 @@ JIT compilation, done in our training script via the flag `--enable_jit`.
 
 We can run this experiment using JIT on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
+$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
 ```
 If running interactively:
 ```
-$ python train.py --config=A100_crop64_sqrt --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
+$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP, APEX and JIT:
@@ -547,14 +547,18 @@ the multi-GPU training with Nsight Systems to understand the communication perfo
 ### Weak and Strong Throughput Scaling
 
 First we want to measure the scaling efficiency while this might change as we increase the scale. The following plot was generated with this command:
-```BENCHY_OUTPUT=weak_scale -N 32 ./submit_pm.sh --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit --enable_benchy --batch_size 64```
+```
+BENCHY_OUTPUT=weak_scale -N 32 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy
+```
 
 <img src="tutorial_images/scale_perfEff.png" width="500">
 
 The plot shows the throughput as we scale up to 32 nodes. The solid green line shows the real data throughput, while the dotted green line shows the ideal throughput, i.e. if we multiply the single GPU throughput by the number of GPUs used. For example for 32 nodes we get around 78% scaling efficiency. The blue lines show the data throughput by running the data-loader in isolation. The orange lines show the throughput for synthetic data.
 
 Next we can further break the performance of the applications, but make the communication between work switched off. The following plot was generated with this command, by adding the noddp flag:
-```BENCHY_OUTPUT=weak_scale_noddp sbatch -N 32 ./submit_pm.sh --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit --enable_benchy --batch_size 64 --noddp```
+```
+BENCHY_OUTPUT=weak_scale_noddp sbatch -N 32 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy --noddp
+```
 
 <img src="tutorial_images/scale_perfComm.png" width="500">
 
@@ -573,7 +577,7 @@ Also to understand better the reason for this improvement we can look at the fol
 Using the optimized options for compute and I/O, we profile the communication baseline with 
 4 GPUs (1 node) on Perlmutter: 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_baseline sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_baseline sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling
 ```
 Considering both the case of strong scaling and large-batch training limitation, the 
 `local_batch_size`, i.e. per GPU batch size, is set to 16 to show the effect of communication. The profile looks like: 
@@ -610,7 +614,7 @@ tunning.
 
 Since there is no batch norm layer in our model, it's safe to disable the `broadcast_buffers` with the added knob `--disable_broadcast_buffers`:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_nobroadcast sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_nobroadcast sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
 ```
 The profile looks like:
 ![NSYS 4gpu_nobroadcast](tutorial_images/nsys_4gpu_nobroadcast.png)
@@ -636,7 +640,7 @@ Comparing to the baseline, there are few percentages (performance may slightly v
 To show the effect of the message bucket size, we add another knob to the code, `--bucket_cap_mb`. The current 
 default value in PyTorch is 25 mb. We profile a run with 100 mb bucket size with following command:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_bucket100mb sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_bucket100mb sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
 ```
 The profile looks like (zoomed in to a single iteration):
 ![NSYS 4gpu_bucketcap100mb_zoomed](tutorial_images/nsys_4gpu_bucketcap100mb_zoomed.png)
@@ -661,7 +665,7 @@ Similarly, to understand the cross node performance, we run the baseline and opt
 
 Baseline:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_baseline sbatch -N 2 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling 
+ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_baseline sbatch -N 2 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling 
 ```
 and the performance of the run: 
 ```
@@ -680,7 +684,7 @@ and the performance of the run:
 ```
 Optimized:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_bucket100mb sbatch -N 2 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
+ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_bucket100mb sbatch -N 2 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
 ```
 and the performance of the run:
 ```
