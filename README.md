@@ -528,5 +528,165 @@ we do this weak scaling of the batch size and GPUs:
 These plots show ???% scaling efficiency with respect to ideal scaling at ??? GPUs.
 
 ## Multi-GPU performance profiling and optimization
+
+With distributed training enabled and large batch convergence tested, we are ready 
+to optimize the multi-GPU training throughput. We start with understanding and ploting
+the performance of our application as we scale. Then we can go in more details and profile 
+the multi-GPU training with Nsight Systems to understand the communication performance. 
+
+### Weak and Strong Throughput Scaling
+
+First we want to measure the scaling efficiency while this might change as we increase the scale. The following plot was generated with this command:
+```BENCHY_OUTPUT=weak_scale -N 32 ./submit_pm.sh --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit --enable_benchy --batch_size 64```
+
+<img src="tutorial_images/scale_perfEff.png" width="500">
+
+The plot shows the throughput as we scale up to 32 nodes. The solid green line shows the real data throughput, while the dotted green line shows the ideal throughput, i.e. if we multiply the single GPU throughput by the number of GPUs used. For example for 32 nodes we get around 78% scaling efficiency. The blue lines show the data throughput by running the data-loader in isolation. The orange lines show the throughput for synthetic data.
+
+Next we can further break the performance of the applications, but make the communication between work switched off. The following plot was generated with this command, by adding the noddp flag:
+```BENCHY_OUTPUT=weak_scale_noddp sbatch -N 32 ./submit_pm.sh --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit --enable_benchy --batch_size 64 --noddp```
+
+<img src="tutorial_images/scale_perfComm.png" width="500">
+
+The orange line is with synthetic data, so no I/O overhead, and the orange dotted line is with synthetic data but having the communication between work switched off. That effectively makes the dotted orange line the compute of the application. By comparing it with the solid orange line we can get the communication overhead. For example in this case for 32 nodes the communication overhead is around 25%.
+
+The first thing we can do to improve communication is to make sure that we are using the compute capabilities of our GPU. Because Pytorch is optimizing the overlap between communication and compute, a better compute will lead to a higher overlap and so better throughput. In the following plot we increased the batch size from 64 to 128 and we can see the scaling efficiency increased to around 89% for 32 nodes.
+
+<img src="tutorial_images/scale_perfEff_bs128.png" width="500">
+
+Also to understand better the reason for this improvement we can look at the following plot of the communication overhead. The blue lines are with batch size of 128 and the orange lines with batch size 64. The difference between the solid and dotted lines is smaller for larger batch size as expected. For example for 32 nodes we see an improvement in the communication overhead from 25% for batch size 64, to 12% for batch size 128.
+
+<img src="tutorial_images/scale_perfDiffBS.png" width="500">
+
 ### Profiling with Nsight Systems
+
+Using the optimized options for compute and I/O, we profile the communication baseline with 
+4 GPUs (1 node) on Perlmutter: 
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_baseline sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling
+```
+Considering both the case of strong scaling and large-batch training limitation, the 
+`local_batch_size`, i.e. per GPU batch size, is set to 16 to show the effect of communication. The profile looks like: 
+![NSYS 4gpu_Baseline](tutorial_images/nsys_4gpu_baseline.png)
+where the stream 20 shows the NCCL communication calls. 
+
+By default, for our model there are 8 NCCL calls per iteration, as shown in zoomed-in view:
+![NSYS 4gpu_Baseline_zoomed](tutorial_images/nsys_4gpu_baseline_zoomed.png)
+
+The performance of this run:
+```
+2021-11-10 04:03:37,792 - root - INFO - Time taken for epoch 2 is 61.7418851852417 sec, avg 1061.4512304471264 samples/sec
+2021-11-10 04:03:37,792 - root - INFO -   Avg train loss=0.006371
+2021-11-10 04:03:41,047 - root - INFO -   Avg val loss=0.006337
+2021-11-10 04:03:41,048 - root - INFO -   Total validation time: 3.254544973373413 sec
+2021-11-10 04:04:32,869 - root - INFO - Time taken for epoch 3 is 51.81808805465698 sec, avg 1264.7321130581577 samples/sec
+2021-11-10 04:04:32,869 - root - INFO -   Avg train loss=0.005793
+2021-11-10 04:04:36,134 - root - INFO -   Avg val loss=0.005889
+2021-11-10 04:04:36,134 - root - INFO -   Total validation time: 3.2647454738616943 sec
+2021-11-10 04:05:27,672 - root - INFO - Time taken for epoch 4 is 51.53450584411621 sec, avg 1271.6916350810875 samples/sec
+2021-11-10 04:05:27,672 - root - INFO -   Avg train loss=0.005587
+2021-11-10 04:05:30,891 - root - INFO -   Avg val loss=0.005936
+2021-11-10 04:05:30,891 - root - INFO -   Total validation time: 3.2182624340057373 sec
+```
+
 ### Adjusting DistributedDataParallel options
+
+The tunning [knobs](https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) 
+for `DistributedDataParallel` includes `broadcast_buffers`, `bucket_cap_mb`, etc. `broadcast_buffers` adds 
+additional communication (syncing buffers) and is enabled by default, which is often not necessary. `bucket_cap_mb` 
+sets a upper limit for the messsage size per NCCL call, adjusting which can change the total number of communication 
+calls per iteration. The proper bucket size depends on the overlap between communication and computation, and requires 
+tunning. 
+
+Since there is no batch norm layer in our model, it's safe to disable the `broadcast_buffers` with the added knob `--disable_broadcast_buffers`:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_nobroadcast sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
+```
+The profile looks like:
+![NSYS 4gpu_nobroadcast](tutorial_images/nsys_4gpu_nobroadcast.png)
+The per step timing is slightly improved comparing to the baseline. 
+
+The performance of this run: 
+```
+2021-11-10 04:12:07,932 - root - INFO - Time taken for epoch 2 is 62.6831419467926 sec, avg 1045.5123652804289 samples/sec
+2021-11-10 04:12:07,932 - root - INFO -   Avg train loss=0.006372
+2021-11-10 04:12:11,173 - root - INFO -   Avg val loss=0.006370
+2021-11-10 04:12:11,173 - root - INFO -   Total validation time: 3.2399580478668213 sec
+2021-11-10 04:13:01,406 - root - INFO - Time taken for epoch 3 is 50.23048114776611 sec, avg 1304.705798202663 samples/sec
+2021-11-10 04:13:01,406 - root - INFO -   Avg train loss=0.005815
+2021-11-10 04:13:04,636 - root - INFO -   Avg val loss=0.005902
+2021-11-10 04:13:04,636 - root - INFO -   Total validation time: 3.22876238822937 sec
+2021-11-10 04:13:54,472 - root - INFO - Time taken for epoch 4 is 49.83389210700989 sec, avg 1315.088933035222 samples/sec
+2021-11-10 04:13:54,473 - root - INFO -   Avg train loss=0.005614
+2021-11-10 04:13:57,722 - root - INFO -   Avg val loss=0.005941
+2021-11-10 04:13:57,723 - root - INFO -   Total validation time: 3.2491915225982666 sec
+```
+Comparing to the baseline, there are few percentages (performance may slightly vary run by run) improvement in `samples/sec`. 
+
+To show the effect of the message bucket size, we add another knob to the code, `--bucket_cap_mb`. The current 
+default value in PyTorch is 25 mb. We profile a run with 100 mb bucket size with following command:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_bucket100mb sbatch -n 4 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
+```
+The profile looks like (zoomed in to a single iteration):
+![NSYS 4gpu_bucketcap100mb_zoomed](tutorial_images/nsys_4gpu_bucketcap100mb_zoomed.png)
+the total number of NCCL calls per step now reduced to 5. 
+
+The performance of this run:
+```
+2021-11-10 04:19:48,472 - root - INFO - Time taken for epoch 2 is 59.066428899765015 sec, avg 1109.5304256706254 samples/sec
+2021-11-10 04:19:48,472 - root - INFO -   Avg train loss=0.006478
+2021-11-10 04:19:51,711 - root - INFO -   Avg val loss=0.006588
+2021-11-10 04:19:51,712 - root - INFO -   Total validation time: 3.239215612411499 sec
+2021-11-10 04:20:41,475 - root - INFO - Time taken for epoch 3 is 49.75986886024475 sec, avg 1317.0452716437817 samples/sec
+2021-11-10 04:20:41,475 - root - INFO -   Avg train loss=0.005917
+2021-11-10 04:20:44,730 - root - INFO -   Avg val loss=0.006044
+2021-11-10 04:20:44,730 - root - INFO -   Total validation time: 3.2542178630828857 sec
+2021-11-10 04:21:34,517 - root - INFO - Time taken for epoch 4 is 49.78394103050232 sec, avg 1316.4084370067546 samples/sec
+2021-11-10 04:21:34,517 - root - INFO -   Avg train loss=0.005700
+2021-11-10 04:21:37,772 - root - INFO -   Avg val loss=0.006073
+2021-11-10 04:21:37,773 - root - INFO -   Total validation time: 3.2548396587371826 sec
+```
+Similarly, to understand the cross node performance, we run the baseline and optimized options with 2 nodes on Perlmutter. 
+
+Baseline:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_baseline sbatch -N 2 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling 
+```
+and the performance of the run: 
+```
+2021-11-10 02:41:30,680 - root - INFO - Time taken for epoch 2 is 44.45261096954346 sec, avg 1474.2891040731388 samples/sec
+2021-11-10 02:41:30,710 - root - INFO -   Avg train loss=0.007586
+2021-11-10 02:41:32,457 - root - INFO -   Avg val loss=0.007256
+2021-11-10 02:41:32,457 - root - INFO -   Total validation time: 1.7458698749542236 sec
+2021-11-10 02:42:08,002 - root - INFO - Time taken for epoch 3 is 35.54009485244751 sec, avg 1844.0018315113414 samples/sec
+2021-11-10 02:42:08,028 - root - INFO -   Avg train loss=0.006422
+2021-11-10 02:42:09,688 - root - INFO -   Avg val loss=0.006547
+2021-11-10 02:42:09,688 - root - INFO -   Total validation time: 1.6595783233642578 sec
+2021-11-10 02:42:45,635 - root - INFO - Time taken for epoch 4 is 35.94469451904297 sec, avg 1823.245429594067 samples/sec
+2021-11-10 02:42:45,644 - root - INFO -   Avg train loss=0.006166
+2021-11-10 02:42:47,310 - root - INFO -   Avg val loss=0.006547
+2021-11-10 02:42:47,310 - root - INFO -   Total validation time: 1.6650199890136719 sec
+```
+Optimized:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=8gpu_bucket100mb sbatch -N 2 ./submit_pm.sh --config=bs64 --data_loader_config=dali-lowmem --enable_apex --enable_jit --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
+```
+and the performance of the run:
+```
+2021-11-10 02:41:28,509 - root - INFO - Time taken for epoch 2 is 43.84619975090027 sec, avg 1494.67913689953 samples/sec
+2021-11-10 02:41:28,528 - root - INFO -   Avg train loss=0.007528
+2021-11-10 02:41:30,271 - root - INFO -   Avg val loss=0.007238
+2021-11-10 02:41:30,272 - root - INFO -   Total validation time: 1.742598056793213 sec
+2021-11-10 02:42:05,129 - root - INFO - Time taken for epoch 3 is 34.85356664657593 sec, avg 1880.3240616534827 samples/sec
+2021-11-10 02:42:05,136 - root - INFO -   Avg train loss=0.006444
+2021-11-10 02:42:06,803 - root - INFO -   Avg val loss=0.006532
+2021-11-10 02:42:06,804 - root - INFO -   Total validation time: 1.6663029193878174 sec
+2021-11-10 02:42:42,100 - root - INFO - Time taken for epoch 4 is 35.293962717056274 sec, avg 1856.8614843673777 samples/sec
+2021-11-10 02:42:42,123 - root - INFO -   Avg train loss=0.006195
+2021-11-10 02:42:43,763 - root - INFO -   Avg val loss=0.006568
+2021-11-10 02:42:43,786 - root - INFO -   Total validation time: 1.6387364864349365 sec
+```
+Note that the batch size is set to a small value to tune the knobs at smaller scale. To have a better scaliing efficiency, we
+ want to increase the per GPU compute intensity by increasing the per GPU batch size, which will be discussed in the following section. 
+

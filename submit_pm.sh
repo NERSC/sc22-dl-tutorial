@@ -19,6 +19,8 @@ hostname
 
 #~/dummy
 
+export NCCL_NET_GDR_LEVEL=PHB
+
 # Profiling
 if [ "${ENABLE_PROFILING:-0}" -eq 1 ]; then
     echo "Enabling profiling..."
