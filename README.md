@@ -11,6 +11,8 @@ Tutorial slides: https://drive.google.com/drive/folders/1Ei56_HDjLMPbdLq9QdQhoxN
 
 Tutorial presentation videos: https://drive.google.com/drive/folders/1TGV6N2Dpj6IZ_sYiSQxlQXCbrmqPkMBZ?usp=sharing
 
+Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invite/zt-yma1xh4z-D5cOLy4F~ZzVfNkNg96P3A
+
 ## Installation and Setup
 
 ### Installing Nsight Systems
