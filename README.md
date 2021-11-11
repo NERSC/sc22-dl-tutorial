@@ -15,20 +15,26 @@ Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invi
 
 ## Installation and Setup
 
-### Installing Nsight Systems
-In this tutorial, we will be generating profile files using NVIDIA Nsight Systems on the remote systems. In order to open and view these
-files on your local computer, you will need to install the Nsight Systems program, which you can download [here](https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2021-4-1-73). Select the download option required for your system (e.g. Mac OS host for MacOS, Window Host for Windows, or Linux Host .rpm/.deb/.run for Linux). You may need to sign up and create a login to NVIDIA's developer program if you do not
-already have an account to access the download. Proceed to run and install the program using your selected installation method.
-
 ### Software environment
 
 Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter-dl.nersc.gov](http://jupyter-dl.nersc.gov). Visiting that URL will open up a JupyterHub session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
-For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain4` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically(???) as is, but if you submit your own custom jobs via `salloc` or `sbatch` yout must include the following flags for slurm:
+Training account setup instructions will be given during the session. Use your provided account credentials and log in to Jupyter. Start a terminal and clone this repository with
+```
+git clone https://github.com/NERSC/sc21-dl-tutorial.git
+```
+You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository (`cd sc21-dl-tutorial`).
+
+For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain4` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically as is, but if you submit your own custom jobs via `salloc` or `sbatch` you must include the following flags for slurm:
 * `-A ntrain4_g` is required for training accounts
 * `--reservation=ntrain4???` is required to access the set of GPU nodes we have reserved for the duration of the tutorial.
 
 The code can be run using the `romerojosh/containers:sc21_tutorial` docker container. On Perlmutter, docker containers are run via [shifter](https://docs.nersc.gov/development/shifter/), and this container is already downloaded and automatically invoked by our job submission scripts. Our container is based on the [NVIDIA ngc 20.10 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel_21-10.html#rel_21-10), with a few additional packages added. See the dockerfile in [`docker/Dockerfile`](docker/Dockerfile) for details.
+
+### Installing Nsight Systems
+In this tutorial, we will be generating profile files using NVIDIA Nsight Systems on the remote systems. In order to open and view these
+files on your local computer, you will need to install the Nsight Systems program, which you can download [here](https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2021-4-1-73). Select the download option required for your system (e.g. Mac OS host for MacOS, Window Host for Windows, or Linux Host .rpm/.deb/.run for Linux). You may need to sign up and create a login to NVIDIA's developer program if you do not
+already have an account to access the download. Proceed to run and install the program using your selected installation method.
 
 ## Model, data, and training code overview
 
