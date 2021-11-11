@@ -92,6 +92,10 @@ bs512: # 8 GPUs
   global_batch_size: 512
   num_epochs: 40
 
+bs512_test: # 8 GPUs
+  <<: *bs64
+  global_batch_size: 512
+
 bs2048: # 32 GPUs
   <<: *bs64
   global_batch_size: 2048
