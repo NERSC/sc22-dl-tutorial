@@ -546,18 +546,18 @@ the multi-GPU training with Nsight Systems to understand the communication perfo
 
 ### Weak and Strong Throughput Scaling
 
-First we want to measure the scaling efficiency while this might change as we increase the scale. The following plot was generated with this command:
+First we want to measure the scaling efficiency while this might change as we increase the scale. An example command to generate the points for 8 nodes is:
 ```
-BENCHY_OUTPUT=weak_scale -N 32 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy
+BENCHY_OUTPUT=weak_scale sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy
 ```
 
 <img src="tutorial_images/scale_perfEff.png" width="500">
 
 The plot shows the throughput as we scale up to 32 nodes. The solid green line shows the real data throughput, while the dotted green line shows the ideal throughput, i.e. if we multiply the single GPU throughput by the number of GPUs used. For example for 32 nodes we get around 78% scaling efficiency. The blue lines show the data throughput by running the data-loader in isolation. The orange lines show the throughput for synthetic data.
 
-Next we can further break the performance of the applications, but make the communication between work switched off. The following plot was generated with this command, by adding the noddp flag:
+Next we can further break the performance of the applications, but make the communication between work switched off. An example command to generate the points for 8 nodes and adding the noddp flag is:
 ```
-BENCHY_OUTPUT=weak_scale_noddp sbatch -N 32 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy --noddp
+BENCHY_OUTPUT=weak_scale_noddp sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy --noddp
 ```
 
 <img src="tutorial_images/scale_perfComm.png" width="500">
@@ -702,5 +702,5 @@ and the performance of the run:
 2021-11-10 02:42:43,786 - root - INFO -   Total validation time: 1.6387364864349365 sec
 ```
 Note that the batch size is set to a small value to tune the knobs at smaller scale. To have a better scaliing efficiency, we
- want to increase the per GPU compute intensity by increasing the per GPU batch size, which will be discussed in the following section. 
+ want to increase the per GPU compute intensity by increasing the per GPU batch size. 
 
