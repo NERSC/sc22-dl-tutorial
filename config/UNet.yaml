@@ -2,16 +2,19 @@ base: &base
 
   # Training config
   weight_init: {conv_init: 'normal', conv_scale: 0.02, conv_bias: 0.}
-  lambda_rho: 1E-2 # weight for additional rho loss term
+  lambda_rho: 0 # weight for additional rho loss term
   full_scale: True # whether or not to use all 6 of the scales in U-Net
   global_batch_size: 64 # number of samples per training batch
   base_batch_size: 64 # single GPU batch size
-  num_epochs: 2
+  Nsamples: 65536
+  Nsamples_val: 8192
+  num_epochs: 10
   enable_amp: False
   enable_apex: False
   enable_benchy: False
   enable_jit: False
   expdir: '/logs'
+
   # params for setting learning rate (cosine decay schedule):
   #   start_lr: initial learning rate
   #   end_lr:  final learning rate
@@ -20,10 +23,10 @@ base: &base
   #   scaling: 'none' initial lr doesn't change with respect to global batch size
   #            'linear' scale up according to lr_global_batchsize = (global_batchsize/base_batchsize)*lr_base_batchsize
   #            'sqrt' scale up according to lr_global_batchsize = sqrt(global_batchsize/base_batchsize)*lr_base_batchsize
-  lr_schedule: {scaling: 'none', start_lr: 1.E-4, end_lr: 0., warmup_steps: 0}
+  lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
 
   # Data
-  data_loader_config: 'synthetic' # choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'
+  data_loader_config: 'lowmem' # choices: 'synthetic', 'inmem', 'lowmem', 'dali-lowmem'
   box_size: [1024, 512] # total size of simulation boxes (train, validation)
   data_size: 64 # size of crops for training
   num_data_workers: 2 # number of dataloader worker threads per proc
@@ -38,75 +41,51 @@ base: &base
   val_path_npy_label: '/data/downsamp_1024crop_valid_label.npy'
   use_cache: None # set this to a cache dir (e.g., NVMe on CoriGPU) if you copied data there
 
-
-#------------------------------------------------------------------------
-
-# A100 configs: for Perlmutter (crop sizes 64 and 96)
-
-#------------------------------------------------------------------------
-
-#                       ----   CROP SIZE 64   ----
-
-
-A100_crop64_sqrt: &crop64_A100
+# A short config for testing/profiling on a single A100
+short: &short
   <<: *base
-  data_loader_config: 'lowmem'
-  data_size: 64
   Nsamples: 4096
   Nsamples_val: 512
-  num_epochs: 80
-  global_batch_size: 64
-  lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
-  lambda_rho: 0.
+  num_epochs: 4
 
-V100_crop64_sqrt: &crop64_V100
-  <<: *base
-  data_loader_config: 'lowmem'
-  data_size: 64
-  Nsamples: 4096
-  Nsamples_val: 512
-  num_epochs: 80
-  global_batch_size: 32
-  lr_schedule: {scaling: 'sqrt', start_lr: 1.414214E-4, end_lr: 0., warmup_steps: 128}
-  lambda_rho: 0.
+# Short config with full optimizations
+short_opt:
+  <<: *short
+  data_loader_config: 'dali-lowmem'
+  enable_amp: True
+  enable_apex: True
+  enable_jit: True
 
-
-bs64: &bs64
+# Full training, batch size 64, with optimizations
+bs64_opt: &bs64_opt
   <<: *base
   data_loader_config: 'dali-lowmem'
-  data_size: 64
-  Nsamples: 65536
-  Nsamples_val: 8192
-  num_epochs: 10
   global_batch_size: 64
-  lr_schedule: {scaling: 'sqrt', start_lr: 2.E-4, end_lr: 0., warmup_steps: 128}
-  lambda_rho: 0.
+  enable_amp: True
+  enable_apex: True
+  enable_jit: True
 
-bs256: # 4 GPUs
-  <<: *bs64
+bs256_opt: # 4 GPUs
+  <<: *bs64_opt
   global_batch_size: 256
   num_epochs: 20
 
-bs512: # 8 GPUs
-  <<: *bs64
+bs512_test: # 8 GPUs
+  <<: *bs64_opt
+  global_batch_size: 512
+
+bs512_opt: # 8 GPUs
+  <<: *bs64_opt
   global_batch_size: 512
   num_epochs: 40
 
-bs512_test: # 8 GPUs
-  <<: *bs64
-  global_batch_size: 512
-
-bs2048: # 32 GPUs
-  <<: *bs64
+bs2048_opt: # 32 GPUs
+  <<: *bs64_opt
   global_batch_size: 2048
   num_epochs: 160
 
-bs8192: # 128 GPUs
-  <<: *bs64
-  global_batch_size: 8192
-  num_epochs: 640
-
-bs8192_short:
-  <<: *bs64
+# Warning: training may be unstable
+bs8192_opt: # 128 GPUs
+  <<: *bs64_opt
   global_batch_size: 8192
   num_epochs: 320
