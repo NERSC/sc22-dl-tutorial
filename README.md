@@ -7,19 +7,22 @@ This repository contains the example code material for the SC21 tutorial:
 
 ## Links
 
-## Installation
+## Installation and Setup
 
 ### Installing Nsight Systems
 In this tutorial, we will be generating profile files using NVIDIA Nsight Systems on the remote systems. In order to open and view these
 files on your local computer, you will need to install the Nsight Systems program, which you can download [here](https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2021-4-1-73). Select the download option required for your system (e.g. Mac OS host for MacOS, Window Host for Windows, or Linux Host .rpm/.deb/.run for Linux). You may need to sign up and create a login to NVIDIA's developer program if you do not
 already have an account to access the download. Proceed to run and install the program using your selected installation method.
 
-## 3D U-Net for Cosmological Simulations
-The code can be run using the `romerojosh/containers:sc21_tutorial` docker container (on Perlmutter, docker containers are run via [shifter](https://docs.nersc.gov/development/shifter/), and this container is already available so no download is required). This container is based on the [Nvidia ngc 20.10 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel_21-10.html#rel_21-10), with a few additional packages added. See the dockerfile in [`docker/Dockerfile`](docker/Dockerfile) for details.
+### Software environment
+
+Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter-dl.nersc.gov](http://jupyter-dl.nersc.gov). Visiting that URL will open up a JupyterHub session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
 For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain4` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically(???) as is, but if you submit your own custom jobs via `salloc` or `sbatch` yout must include the following flags for slurm:
 * `-A ntrain4_g` is required for training accounts
 * `--reservation=ntrain4???` is required to access the set of GPU nodes we have reserved for the duration of the tutorial.
+
+The code can be run using the `romerojosh/containers:sc21_tutorial` docker container. On Perlmutter, docker containers are run via [shifter](https://docs.nersc.gov/development/shifter/), and this container is already downloaded and automatically invoked by our job submission scripts. Our container is based on the [NVIDIA ngc 20.10 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel_21-10.html#rel_21-10), with a few additional packages added. See the dockerfile in [`docker/Dockerfile`](docker/Dockerfile) for details.
 
 ## Model, data, and training code overview
 
@@ -34,7 +37,9 @@ The basic data loading pipeline is defined in [`utils/data_loader.py`](utils/dat
 * The `RandomRotator` transform, which applies random rotations and reflections to the samples as data augmentations
 * The above components are assembled to feed a PyTorch `DataLoader` which takes the augmented samples and combines them into a batch for each training step.
 
-As we will see in the [Single GPU performance profiling and optimization](#Single-GPU-performance-profiling-and-optimization) section, the random rotations add considerable overhead to data loading during training, and we can achieve performance gains by doing these preprocessing steps on the GPU instead using Nvidia's DALI library. Code for this is found in [`utils/data_loader_dali.py`](utils/data_loader_dali.py).
+It is common practice to decay the learning rate according to some schedule as the model trains, so that the optimizer can settle into sharper minima during gradient descent. Here we opt for the cosine learning rate decay schedule, which starts at an intial learning rate and decays continuously throughout training according to a cosine function. This is handled by the `lr_schedule` routine defined in [`utils/__init__.py`](utils/__init__.py), which also has logic to implement learning rate scaling and warm-up for use in the [Distributed GPU training](#Distributed-GPU-training) section
+
+As we will see in the [Single GPU performance profiling and optimization](#Single-GPU-performance-profiling-and-optimization) section, the random rotations add considerable overhead to data loading during training, and we can achieve performance gains by doing these preprocessing steps on the GPU instead using NVIDIA's DALI library. Code for this is found in [`utils/data_loader_dali.py`](utils/data_loader_dali.py).
 
 The script to train the model is [`train.py`](train.py), which uses the following arguments to load the desired training setup:
 ```
@@ -51,14 +56,14 @@ Based on the selected configuration, the train script will then:
     * Applying the model to the validation dataset and logging training and validation metrics to visualize in TensorBoard (see if you can find where we construct the TensorBoard `SummaryWriter` and where our specific metrics are logged via the `add_scalar` call).
 
 Besides the `train.py` script, we have a slightly more complex [`train_graph.py`](train_graph.py)
-script, which implements the same functionality with added capability for using the Cuda Graphs APIs introduced in PyTorch 1.10. This topic will be covered in the [Single GPU performance profiling and optimization](#Single-GPU-performance-profiling-and-optimization) section.
+script, which implements the same functionality with added capability for using the CUDA Graphs APIs introduced in PyTorch 1.10. This topic will be covered in the [Single GPU performance profiling and optimization](#Single-GPU-performance-profiling-and-optimization) section.
 
 More info on the model and data can be found in the [?? slides link](link_to_gdrive_slides).
 
 
 ## Single GPU training
 
-First, let us look at the performance of the trianing script without optimizations on a single GPU.
+First, let us look at the performance of the training script without optimizations on a single GPU.
 
 On Perlmutter for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
 ```
@@ -492,40 +497,45 @@ weights in the distributed setting.
 
 ### Large batch convergence
 
+#### NOTE: Figs here are placeholders, need to annotate/polish them
+
 To speed up training, we try to use larger batch sizes, spread across more GPUs,
-with larger learning rates. In particular, we try increasing from ??? to ???,
-and scale the batch size similarly to ???.
-The first thing we demonstrate here is increasing
-the learning rate according to the square-root scaling rule. The settings for
-batch size ??? are in ???, respectively.
-We view the accuracy plots in TensorBoard and notice that the convergence
-performs worse with larger batch size, i.e. we see a generalization gap:
+with larger learning rates. The base config uses a batchsize of 64 for single-GPU training, so we will set `base_batch_size=64` in our configs and then increase the `global_batch_size` parameter in increments of 64 for every additional GPU we add to the distributed training. Then, we can take the ratio of `global_batch_size` and `base_batch_size` to decide how much to scale up the learning rate as the global batch size grows. In this section, we will make use of the square-root scaling rule, which multiplies the base initial learning rate by `sqrt(global_batch_size/base_batch_size)`. Take a look at [`utils/__init__.py`](utils/__init__.py) to see how this is implemented.
+
+As a first attempt, let's try increasing the batchsize from 64 to 512, distributing our training across 8 GPUs (thus two GPU nodes on Perlmutter). To submit a job with this config, do
+```
+sbatch -t 20 -n 8 submit_pm.sh --config=bs512_test
+```
+
+Looking at the TensorBoard log, we can see that the rate of convergence is greatly increased initially, but the validation loss plateaus quickly and our final accuracy ends up worse than the single-GPU training:
+![batchsize 512 bad](tutorial_images/bs512_short.png)
+
+From the plot, we see that with a global batch size of 512 we complete each epoch in a much shorter amount of time, so training concludes rapidly. This affects our learning rate schedule, which depends on the total number of steps as set in `train.py`:
+```
+params.lr_schedule['tot_steps'] = params.num_epochs*(params.Nsamples//params.global_batch_size)
+```
+
+If we increase the total number of epochs, we will run longer (thus giving the model more training iterations to update weights) and the learning rate will decay more slowly, giving us more time to converge quickly with a larger learning rate. To try this out, run the `bs512_opt` config, which runs for 40 epochs rather than the default 10:
+```
+sbatch -t 20 -n 8 submit_pm.sh --config=bs512_opt
+```
+With the longer training, we can see that our higher batch size results are actually better than the baseline configuration. Furthermore, the minimum in the loss is reached sooner, despite running for more epochs:
+![batchsize 512 good](tutorial_images/bs512.png)
+
+Based on our findings, we can strategize to have trainings with larger batch sizes run for at least half as many total iterations as the baseline, as a rule of thumb. You can see this imlemented in the different configs for various global batchsizes: `bs256_opt`, `bs512_opt`, `bs2048_opt`. Comparing results between these configs, we see all of them improve over the baseline, and the rate of convergence improves as we add more GPUs and increase the global batch size:
+![comparison across batchsizes](tutorial_images/bs_compare.png)
 
 
-Next, as suggested in the presentation previously, we apply a linear learning rate
-warmup for these batch sizes. You can see where we compute the learning rate
-in the warmup phase in our Trainer's `train` method in the `train.py` script.
-Look for the comment, "Apply learning rate warmup".
-As shown in configs `???` and `???` in our
-`config/???.yaml` file, we use ??? and ??? epochs for the warmup,
-respectively.
+We can now try to go even further, and see what happens with a global batchsize of 8192, running with 128 GPUs. We find that the rule of thumb from before does not hold as well here; the training starts okay, but then diverges after some number of iterations. In this case, reducing the total number of epochs (to decay the learning rate faster) does the trick.
+![big batchsize](tutorial_images/bs8192.png)
 
-Now we can see the generalization gap closes and
-the higher batch size results are as good as the original batch size 128:
+Based on our study, we see that scaling up our U-Net can definitely speed up training and reduce time-to-solution, but there are several considerations to be aware of and several key hyperparameters to tune. Now, we leave it to you to try to further tune things and reach the lowest possible validation loss, or achieve the single-GPU validation loss (`~4.7e-3`) in the shortest amount of time. Some ideas for things to adjust are:
+* Further tune `num_epochs` to adjust how long it takes for learning rate to decay, and for training to conclude.
+* Play with the learning rate: try out a different scaling rule, such as linear scale-up of learning rate, or come up with your own learning rate schedule.
+* Change other components, such as the optimizer used. Here we have used the standard Adam optimizer, but many practitioners also use the SGD optimizer (with momentum) in distributed training.
 
+The [PyTorch docs](https://pytorch.org/docs/stable/index.html) will be helpful if you are attempting more advanced changes.
 
-Next, we can now look at the wallclock time to see that, indeed, using
-these tricks together result in a much faster convergence:
-
-
-In particular, our batch size ??? run on 1 gpu takes about ??? min to converge,
-while our batch size ??? run on ??? gpus takes around ??? min.
-
-Finally, we look at the throughput (images/second) of our training runs as
-we do this weak scaling of the batch size and GPUs:
-
-
-These plots show ???% scaling efficiency with respect to ideal scaling at ??? GPUs.
 
 ## Multi-GPU performance profiling and optimization
 
