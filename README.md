@@ -8,6 +8,7 @@ This repository contains the example code material for the SC21 tutorial:
 ## Links
 
 Tutorial slides: https://drive.google.com/drive/folders/1Ei56_HDjLMPbdLq9QdQhoxN3J1YdzZw0?usp=sharing
+
 Tutorial presentation videos: https://drive.google.com/drive/folders/1TGV6N2Dpj6IZ_sYiSQxlQXCbrmqPkMBZ?usp=sharing
 
 ## Installation and Setup
