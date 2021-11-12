@@ -1,0 +1,74 @@
+2021-11-12 00:32:26,118 - root - INFO - ------------------ Configuration ------------------
+2021-11-12 00:32:26,118 - root - INFO - Configuration file: /global/u2/p/pharring/production/sc21/sc21-dl-tutorial/config/UNet.yaml
+2021-11-12 00:32:26,118 - root - INFO - Configuration name: base
+2021-11-12 00:32:26,118 - root - INFO - weight_init ordereddict([('conv_init', 'normal'), ('conv_scale', 0.02), ('conv_bias', 0.0)])
+2021-11-12 00:32:26,118 - root - INFO - lambda_rho 0
+2021-11-12 00:32:26,119 - root - INFO - full_scale True
+2021-11-12 00:32:26,119 - root - INFO - global_batch_size 64
+2021-11-12 00:32:26,119 - root - INFO - base_batch_size 64
+2021-11-12 00:32:26,119 - root - INFO - Nsamples 65536
+2021-11-12 00:32:26,119 - root - INFO - Nsamples_val 8192
+2021-11-12 00:32:26,119 - root - INFO - num_epochs 10
+2021-11-12 00:32:26,119 - root - INFO - enable_amp False
+2021-11-12 00:32:26,119 - root - INFO - enable_apex False
+2021-11-12 00:32:26,119 - root - INFO - enable_benchy False
+2021-11-12 00:32:26,119 - root - INFO - enable_jit False
+2021-11-12 00:32:26,119 - root - INFO - expdir /logs
+2021-11-12 00:32:26,119 - root - INFO - lr_schedule ordereddict([('scaling', 'sqrt'), ('start_lr', 0.0002), ('end_lr', 0.0), ('warmup_steps', 128)])
+2021-11-12 00:32:26,119 - root - INFO - data_loader_config lowmem
+2021-11-12 00:32:26,119 - root - INFO - box_size [1024, 512]
+2021-11-12 00:32:26,119 - root - INFO - data_size 64
+2021-11-12 00:32:26,119 - root - INFO - num_data_workers 2
+2021-11-12 00:32:26,119 - root - INFO - N_out_channels 5
+2021-11-12 00:32:26,119 - root - INFO - train_path /data/downsamp_2048crop_train.h5
+2021-11-12 00:32:26,119 - root - INFO - val_path /data/downsamp_1024crop_valid.h5
+2021-11-12 00:32:26,119 - root - INFO - train_path_npy_data /data/downsamp_2048crop_train_data.npy
+2021-11-12 00:32:26,119 - root - INFO - train_path_npy_label /data/downsamp_2048crop_train_label.npy
+2021-11-12 00:32:26,119 - root - INFO - val_path_npy_data /data/downsamp_1024crop_valid_data.npy
+2021-11-12 00:32:26,119 - root - INFO - val_path_npy_label /data/downsamp_1024crop_valid_label.npy
+2021-11-12 00:32:26,119 - root - INFO - use_cache None
+2021-11-12 00:32:26,119 - root - INFO - ---------------------------------------------------
+2021-11-12 00:32:26,150 - root - INFO - rank 0, begin data loader init
+2021-11-12 00:32:26,441 - root - INFO - rank 0, data loader initialized with config lowmem
+2021-11-12 00:32:47,010 - root - INFO - Starting Training Loop...
+2021-11-12 00:46:23,492 - root - INFO - Time taken for epoch 1 is 752.9529612064362 sec, avg 87.03863770585806 samples/sec
+2021-11-12 00:46:23,492 - root - INFO -   Avg train loss=0.014280
+2021-11-12 00:47:36,657 - root - INFO -   Avg val loss=0.007129
+2021-11-12 00:47:36,657 - root - INFO -   Total validation time: 73.16440415382385 sec
+2021-11-12 00:59:52,873 - root - INFO - Time taken for epoch 2 is 736.1673448085785 sec, avg 89.02323698837927 samples/sec
+2021-11-12 00:59:52,874 - root - INFO -   Avg train loss=0.006163
+2021-11-12 01:01:03,747 - root - INFO -   Avg val loss=0.006131
+2021-11-12 01:01:03,747 - root - INFO -   Total validation time: 70.87276315689087 sec
+2021-11-12 01:13:09,400 - root - INFO - Time taken for epoch 3 is 725.6503672599792 sec, avg 90.31346631499791 samples/sec
+2021-11-12 01:13:09,401 - root - INFO -   Avg train loss=0.005703
+2021-11-12 01:14:20,543 - root - INFO -   Avg val loss=0.005793
+2021-11-12 01:14:20,543 - root - INFO -   Total validation time: 71.14171385765076 sec
+2021-11-12 01:26:34,245 - root - INFO - Time taken for epoch 4 is 733.644660949707 sec, avg 89.32934905457267 samples/sec
+2021-11-12 01:26:34,245 - root - INFO -   Avg train loss=0.005422
+2021-11-12 01:27:46,311 - root - INFO -   Avg val loss=0.005409
+2021-11-12 01:27:46,311 - root - INFO -   Total validation time: 72.06519365310669 sec
+2021-11-12 01:40:11,457 - root - INFO - Time taken for epoch 5 is 745.0990128517151 sec, avg 87.95609559214725 samples/sec
+2021-11-12 01:40:11,458 - root - INFO -   Avg train loss=0.005207
+2021-11-12 01:41:38,000 - root - INFO -   Avg val loss=0.005207
+2021-11-12 01:41:38,000 - root - INFO -   Total validation time: 86.54100251197815 sec
+2021-11-12 01:54:08,192 - root - INFO - Time taken for epoch 6 is 750.1890060901642 sec, avg 87.35931807580144 samples/sec
+2021-11-12 01:54:08,192 - root - INFO -   Avg train loss=0.005045
+2021-11-12 01:55:27,159 - root - INFO -   Avg val loss=0.005085
+2021-11-12 01:55:27,159 - root - INFO -   Total validation time: 78.966463804245 sec
+2021-11-12 02:07:54,065 - root - INFO - Time taken for epoch 7 is 746.9029471874237 sec, avg 87.74366234165463 samples/sec
+2021-11-12 02:07:54,066 - root - INFO -   Avg train loss=0.004935
+2021-11-12 02:09:12,587 - root - INFO -   Avg val loss=0.004972
+2021-11-12 02:09:12,588 - root - INFO -   Total validation time: 78.52156686782837 sec
+2021-11-12 02:21:41,208 - root - INFO - Time taken for epoch 8 is 748.6173532009125 sec, avg 87.5427208837511 samples/sec
+2021-11-12 02:21:41,208 - root - INFO -   Avg train loss=0.004817
+2021-11-12 02:22:59,974 - root - INFO -   Avg val loss=0.004856
+2021-11-12 02:22:59,974 - root - INFO -   Total validation time: 78.76536536216736 sec
+2021-11-12 02:35:29,456 - root - INFO - Time taken for epoch 9 is 749.4797053337097 sec, avg 87.44199413754608 samples/sec
+2021-11-12 02:35:29,457 - root - INFO -   Avg train loss=0.004782
+2021-11-12 02:36:48,701 - root - INFO -   Avg val loss=0.004855
+2021-11-12 02:36:48,701 - root - INFO -   Total validation time: 79.24383068084717 sec
+2021-11-12 02:49:31,830 - root - INFO - Time taken for epoch 10 is 763.1262722015381 sec, avg 85.87831711118477 samples/sec
+2021-11-12 02:49:31,831 - root - INFO -   Avg train loss=0.004771
+2021-11-12 02:50:57,833 - root - INFO -   Avg val loss=0.004844
+2021-11-12 02:50:57,834 - root - INFO -   Total validation time: 86.00221180915833 sec
+2021-11-12 02:50:57,853 - root - INFO - DONE ---- rank 0
