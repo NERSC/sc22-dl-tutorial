@@ -617,7 +617,7 @@ The performance of this run:
 
 ### Adjusting DistributedDataParallel options
 
-The tunning [knobs](https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) 
+The [tuning knobs](https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) 
 for `DistributedDataParallel` includes `broadcast_buffers`, `bucket_cap_mb`, etc. `broadcast_buffers` adds 
 additional communication (syncing buffers) and is enabled by default, which is often not necessary. `bucket_cap_mb` 
 sets a upper limit for the messsage size per NCCL call, adjusting which can change the total number of communication 
