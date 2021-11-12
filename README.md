@@ -136,7 +136,7 @@ $ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f t
 ```
 This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file `baseline.qdrep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
 
-Loading this profile ([`baseline.qdrep`](sample_nsys_files/baseline.qdrep)) in Nsight Systems will look like this:
+Loading this profile ([`baseline.qdrep`](sample_nsys_profiles/baseline.qdrep)) in Nsight Systems will look like this:
 ![NSYS Baseline](tutorial_images/nsys_baseline.png)
 
 From this zoomed out view, we can see a lot idle gaps between iterations. These gaps are due to the data loading, which we will address in the next section.
@@ -239,7 +239,7 @@ This is the performance of the training script for the first three epochs on a 4
 Increasing the number of workers to 8 improves performance to around 270 samples per second, while increasing to 16 workers causes a slight reduction from this.
 
 We can run the 8 worker configuration through profiler using the instructions in the previous section with the added `--num_data_workers`
-argument and load that profile in Nsight Systems. This is what this profile ([`8workers.qdrep`](sample_nsys_files/8workers.qdrep)) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([`8workers.qdrep`](sample_nsys_profiles/8workers.qdrep)) looks like:
 ![NSYS Native Data](tutorial_images/nsys_nativedata_8workers.png)
 
 and zoomed in:
@@ -299,7 +299,7 @@ This is the performance of the training script for the first three epochs on a 4
 ```
 
 We can run the DALI case through profiler using the instructions in the earlier section with the added `--data_loader_config=dali-lowmem`
-argument and load that profile in Nsight Systems. This is what this profile ([`dali.qdrep`](sample_nsys_files/dali.qdrep)) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([`dali.qdrep`](sample_nsys_profiles/dali.qdrep)) looks like:
 ![NSYS DALI](tutorial_images/nsys_dali.png)
 
 and zoomed in to a single iteration:
@@ -377,7 +377,7 @@ This is the performance of the training script for the first three epochs on a 4
 ```
 
 We can run the case with AMP enabled through profiler using the instructions in the earlier section with the added `--data_loader_config=enable_amp`
-argument and load that profile in Nsight Systems. This is what this profile ([`dali_amp.qdrep`](sample_nsys_files/dali_amp.qdrep)) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([`dali_amp.qdrep`](sample_nsys_profiles/dali_amp.qdrep)) looks like:
 ![NSYS DALI AMP](tutorial_images/nsys_dali_amp.png)
 
 and zoomed in to a single iteration:
@@ -454,7 +454,7 @@ This is the performance of the training script for the first three epochs on a 4
 2021-11-09 20:23:03,665 - root - INFO -   Total validation time: 0.7198197841644287 sec
 ```
 
-Running a profile ([`dali_amp_apex_jit.qdrep`](sample_nsys_files/dali_amp_apex_jit.qdrep)) using these new options and loading in Nsight Systems looks like this:
+Running a profile ([`dali_amp_apex_jit.qdrep`](sample_nsys_profiles/dali_amp_apex_jit.qdrep)) using these new options and loading in Nsight Systems looks like this:
 ![NSYS DALI AMP APEX JIT](tutorial_images/nsys_dali_amp_apex_jit.png)
 
 and zoomed in to a single iteration:
@@ -592,7 +592,7 @@ Using the optimized options for compute and I/O, we profile the communication ba
 ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_baseline sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling
 ```
 Considering both the case of strong scaling and large-batch training limitation, the 
-`local_batch_size`, i.e. per GPU batch size, is set to 16 to show the effect of communication. The profile looks like: 
+`local_batch_size`, i.e. per GPU batch size, is set to 16 to show the effect of communication. Loading this profile ([`4gpu_baseline.qdrep`](sample_nsys_profiles/4gpu_baseline.qdrep)) in Nsight Systems will look like this: 
 ![NSYS 4gpu_Baseline](tutorial_images/nsys_4gpu_baseline.png)
 where the stream 20 shows the NCCL communication calls. 
 
@@ -628,7 +628,7 @@ Since there is no batch norm layer in our model, it's safe to disable the `broad
 ```
 ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_nobroadcast sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
 ```
-The profile looks like:
+Loading this profile ([`4gpu_nobroadcast.qdrep`](sample_nsys_profiles/4gpu_nobroadcast.qdrep)) in Nsight Systems will look like this:
 ![NSYS 4gpu_nobroadcast](tutorial_images/nsys_4gpu_nobroadcast.png)
 The per step timing is slightly improved comparing to the baseline. 
 
@@ -654,7 +654,7 @@ default value in PyTorch is 25 mb. We profile a run with 100 mb bucket size with
 ```
 ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_bucket100mb sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
 ```
-The profile looks like (zoomed in to a single iteration):
+Loading this profile ([`4gpu_bucketcap100mb.qdrep`](sample_nsys_profiles/4gpu_bucketcap100mb.qdrep)) in Nsight Systems (zoomed in to a single iteration) will look like this:
 ![NSYS 4gpu_bucketcap100mb_zoomed](tutorial_images/nsys_4gpu_bucketcap100mb_zoomed.png)
 the total number of NCCL calls per step now reduced to 5. 
 
