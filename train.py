@@ -93,8 +93,8 @@ def train(params, args, local_rank, world_rank, world_size):
         torch.distributed.all_reduce(tr_loss)
         torch.distributed.all_reduce(val_loss)
       if world_rank==0:
-        args.tboard_writer.add_scalar('Loss/train', tr_loss.item(), 0)
-        args.tboard_writer.add_scalar('Loss/valid', val_loss.item(), 0)
+        args.tboard_writer.add_scalar('Loss/train', tr_loss.item()/world_size, 0)
+        args.tboard_writer.add_scalar('Loss/valid', val_loss.item()/world_size, 0)
 
   iters = 0
   t1 = time.time()
