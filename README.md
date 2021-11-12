@@ -146,7 +146,7 @@ Beyond this, we can zoom into a single iteration and get an idea of where comput
 
 
 #### Using the benchy profiling tool
-As an alternative to manually specifying NVTX ranges, we've included the use of a simple profiling tool `benchy` that overrides the PyTorch dataloader in the script to produce throughput information to the terminal, as well as add NVTX ranges/profiler start and stop calls. This tool also runs a sequence of tests to measure and report the throughput of the dataloader in isolation (`IO`), the model running with synthetic/cached data (`SYNTHETIC`), and the throughput of the model running normally with real data (`FULL`).
+As an alternative to manually specifying NVTX ranges, we've included the use of a simple profiling tool [`benchy`](https://github.com/romerojosh/benchy) that overrides the PyTorch dataloader in the script to produce throughput information to the terminal, as well as add NVTX ranges/profiler start and stop calls. This tool also runs a sequence of tests to measure and report the throughput of the dataloader in isolation (`IO`), the model running with synthetic/cached data (`SYNTHETIC`), and the throughput of the model running normally with real data (`FULL`).
 
 To run using using benchy on Perlmutter, use the following command: 
 ```
@@ -558,25 +558,25 @@ the multi-GPU training with Nsight Systems to understand the communication perfo
 
 ### Weak and Strong Throughput Scaling
 
-First we want to measure the scaling efficiency while this might change as we increase the scale. An example command to generate the points for 8 nodes is:
+First we want to measure the scaling efficiency. An example command to generate the points for 8 nodes is:
 ```
-BENCHY_OUTPUT=weak_scale sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy
+BENCHY_OUTPUT=weak_scale sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy
 ```
 
 <img src="tutorial_images/scale_perfEff.png" width="500">
 
 The plot shows the throughput as we scale up to 32 nodes. The solid green line shows the real data throughput, while the dotted green line shows the ideal throughput, i.e. if we multiply the single GPU throughput by the number of GPUs used. For example for 32 nodes we get around 78% scaling efficiency. The blue lines show the data throughput by running the data-loader in isolation. The orange lines show the throughput for synthetic data.
 
-Next we can further break the performance of the applications, but make the communication between work switched off. An example command to generate the points for 8 nodes and adding the noddp flag is:
+Next we can further breakdown the performance of the applications, by switching off the communication between workers. An example command to generate the points for 8 nodes and adding the noddp flag is:
 ```
-BENCHY_OUTPUT=weak_scale_noddp sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy --noddp
+BENCHY_OUTPUT=weak_scale_noddp sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy --noddp
 ```
 
 <img src="tutorial_images/scale_perfComm.png" width="500">
 
-The orange line is with synthetic data, so no I/O overhead, and the orange dotted line is with synthetic data but having the communication between work switched off. That effectively makes the dotted orange line the compute of the application. By comparing it with the solid orange line we can get the communication overhead. For example in this case for 32 nodes the communication overhead is around 25%.
+The orange line is with synthetic data, so no I/O overhead, and the orange dotted line is with synthetic data but having the communication between compute switched off. That effectively makes the dotted orange line the compute of the application. By comparing it with the solid orange line we can get the communication overhead. For example in this case for 32 nodes the communication overhead is around 25%.
 
-The first thing we can do to improve communication is to make sure that we are using the compute capabilities of our GPU. Because Pytorch is optimizing the overlap between communication and compute, a better compute will lead to a higher overlap and so better throughput. In the following plot we increased the batch size from 64 to 128 and we can see the scaling efficiency increased to around 89% for 32 nodes.
+One thing we can do to improve communication is to make sure that we are using the full compute capabilities of our GPU. Because Pytorch is optimizing the overlap between communication and compute, increasing the compute performed between communication will lead to better throughput. In the following plot we increased the local batch size from 64 to 128 and we can see the scaling efficiency increased to around 89% for 32 nodes.
 
 <img src="tutorial_images/scale_perfEff_bs128.png" width="500">
 
