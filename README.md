@@ -560,7 +560,7 @@ the multi-GPU training with Nsight Systems to understand the communication perfo
 
 First we want to measure the scaling efficiency. An example command to generate the points for 8 nodes is:
 ```
-BENCHY_OUTPUT=weak_scale sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy
+BENCHY_OUTPUT=weak_scale sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy
 ```
 
 <img src="tutorial_images/scale_perfEff.png" width="500">
@@ -569,14 +569,14 @@ The plot shows the throughput as we scale up to 32 nodes. The solid green line s
 
 Next we can further breakdown the performance of the applications, by switching off the communication between workers. An example command to generate the points for 8 nodes and adding the noddp flag is:
 ```
-BENCHY_OUTPUT=weak_scale_noddp sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --config=bs64_opt --enable_benchy --noddp
+BENCHY_OUTPUT=weak_scale_noddp sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy --noddp
 ```
 
 <img src="tutorial_images/scale_perfComm.png" width="500">
 
 The orange line is with synthetic data, so no I/O overhead, and the orange dotted line is with synthetic data but having the communication between compute switched off. That effectively makes the dotted orange line the compute of the application. By comparing it with the solid orange line we can get the communication overhead. For example in this case for 32 nodes the communication overhead is around 25%.
 
-One thing we can do to improve communication is to make sure that we are using the full compute capabilities of our GPU. Because Pytorch is optimizing the overlap between communication and compute, increasing the compute performed between communication will lead to better throughput. In the following plot we increased the batch size from 64 to 128 and we can see the scaling efficiency increased to around 89% for 32 nodes.
+One thing we can do to improve communication is to make sure that we are using the full compute capabilities of our GPU. Because Pytorch is optimizing the overlap between communication and compute, increasing the compute performed between communication will lead to better throughput. In the following plot we increased the local batch size from 64 to 128 and we can see the scaling efficiency increased to around 89% for 32 nodes.
 
 <img src="tutorial_images/scale_perfEff_bs128.png" width="500">
 
