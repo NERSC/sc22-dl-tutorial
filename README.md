@@ -70,7 +70,7 @@ Based on the selected configuration, the train script will then:
 Besides the `train.py` script, we have a slightly more complex [`train_graph.py`](train_graph.py)
 script, which implements the same functionality with added capability for using the CUDA Graphs APIs introduced in PyTorch 1.10. This topic will be covered in the [Single GPU performance profiling and optimization](#Single-GPU-performance-profiling-and-optimization) section.
 
-More info on the model and data can be found in the [?? slides link](link_to_gdrive_slides).
+More info on the model and data can be found in the [slides](https://drive.google.com/drive/u/1/folders/1Ei56_HDjLMPbdLq9QdQhoxN3J1YdzZw0).
 
 
 ## Single GPU training
