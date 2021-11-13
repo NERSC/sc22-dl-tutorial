@@ -4,6 +4,8 @@ This repository contains the example code material for the SC21 tutorial:
 *Deep Learning at Scale*.
 
 **Contents**
+* [Links](#links)
+* [Installation](#installation-and-setup)
 
 ## Links
 
