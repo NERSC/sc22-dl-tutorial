@@ -29,9 +29,8 @@ Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter.
 Training account setup instructions will be given during the session. Once you have your provided account credentials, you can log in to Jupyter via the link (leave the OTP field blank when logging into Jupyter).
 Once logged into the hub, start a session by clicking the button for Perlmutter Shared CPU Node (other options will not work with this tutorial material). This will open up a session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
-To begin, start a terminal and clone this repository to your scratch directory with the following: (**NOTE: some instructions may not work if you don't clone into your SCRATCH directory**)
+To begin, start a terminal and clone this repository to your scratch directory with the following:
 ```
-cd $SCRATCH
 git clone https://github.com/NERSC/sc21-dl-tutorial.git
 ```
 You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository (`cd sc21-dl-tutorial`).
@@ -108,8 +107,14 @@ See [`config/UNet.yaml`](config/UNet.yaml) for specific configuration details.
 Note we will use the default batch size for the optimization work in the next section
 and will push beyond to larger batch sizes in the distributed training section.
 
-In the baseline configuration, the model converges to a loss of about `4.7e-3` on
-the validation dataset in 10 epochs. This takes around 2 hours to run, so we have already included the TensorBoard log for the `base` config in the `logs` directory for you. 
+In the baseline configuration, the model converges to a loss of about `4.75e-3` on
+the validation dataset in 10 epochs. This takes around 2 hours to run, so to save time we have already included an example TensorBoard log for the `base` config in the `example_logs` directory for you.
+We want to compare our training results against the `base` config baseline, and TensorBoard makes this easy as long as all training runs are stored in the same place. 
+To copy the example TensorBoard log to the scratch directory where our training jobs will output their logs, do
+```
+mkdir -p $SCRATCH/sc21-dl-tutorial/logs
+cp ./example_logs/base $SCRATCH/sc21-dl-tutorial/logs
+```
 
 To view results in TensorBoard, open the [`start_tensorboard.ipynb`](start_tensorboard.ipynb) notebook and follow the instructions in it to launch a TensorBoard session in your browser. Once you have TensorBoard open, you should see a dashboard with data for the loss values, learning rate, and average iterations per second. Looking at the validation loss for the `base` config, you should see the following training curve:
 ![baseline training](tutorial_images/baseline_tb.png)
