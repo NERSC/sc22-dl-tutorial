@@ -480,6 +480,13 @@ much using CUDA Graphs, but for models with more CPU latency issues (e.g. from m
 something to consider to improve. Compare [train.py](train.py) and [train_graphs.py](train_graphs.py) to see
 how to use CUDA Graphs in PyTorch.
 
+### Full training with optimizations
+Now you can run the full model training on a single GPU with our optimizations. For convenience, we provide a configuration with the optimizations already enabled. Submit the full training with:
+
+```
+sbatch -n 1 -t 40 ./submit_pm.sh --config=bs64_opt
+```
+
 ## Distributed GPU training
 
 Now that we have model training code that is optimized for training on a single GPU,
