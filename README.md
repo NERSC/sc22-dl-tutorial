@@ -27,8 +27,9 @@ Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invi
 
 Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter-dl.nersc.gov](http://jupyter-dl.nersc.gov). Visiting that URL will open up a JupyterHub session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
-Training account setup instructions will be given during the session. Use your provided account credentials and log in to Jupyter. Start a terminal and clone this repository with
+Training account setup instructions will be given during the session. Use your provided account credentials and log in to Jupyter. Start a terminal and clone this repository to your scratch directory with the following: (**NOTE: some instructions may not work if you don't clone into your SCRATCH directory**)
 ```
+cd $SCRATCH
 git clone https://github.com/NERSC/sc21-dl-tutorial.git
 ```
 You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository (`cd sc21-dl-tutorial`).
