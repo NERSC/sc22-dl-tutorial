@@ -4,6 +4,14 @@ This repository contains the example code material for the SC21 tutorial:
 *Deep Learning at Scale*.
 
 **Contents**
+* [Links](#links)
+* [Installation](#installation-and-setup)
+* [Model, data, and code overview](#model-data-and-training-code-overview)
+* [Single GPU training](#single-gpu-training)
+* [Single GPU performance](#single-gpu-performance-profiling-and-optimization)
+* [Distributed training](#distributed-gpu-training)
+* [Multi GPU performance](#multi-gpu-performance-profiling-and-optimization)
+* [Putting it all together](#putting-it-all-together)
 
 ## Links
 
@@ -21,17 +29,18 @@ Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter.
 Training account setup instructions will be given during the session. Once you have your provided account credentials, you can log in to Jupyter via the link (leave the OTP field blank when logging into Jupyter).
 Once logged into the hub, start a session by clicking the button for Perlmutter Shared CPU Node (other options will not work with this tutorial material). This will open up a session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
-To begin, launch a terminal from Jupyter and clone this repository with
+To begin, start a terminal and clone this repository to your scratch directory with the following: (**NOTE: some instructions may not work if you don't clone into your SCRATCH directory**)
 ```
+cd $SCRATCH
 git clone https://github.com/NERSC/sc21-dl-tutorial.git
 ```
 You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository (`cd sc21-dl-tutorial`).
 
 For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain4` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically as is, but if you submit your own custom jobs via `salloc` or `sbatch` you must include the following flags for slurm:
 * `-A ntrain4_g` is required for training accounts
-* `--reservation=ntrain4???` is required to access the set of GPU nodes we have reserved for the duration of the tutorial.
+* `--reservation=sc21_tutorial_01` is required to access the set of GPU nodes we have reserved for the duration of the tutorial.
 
-The code can be run using the `romerojosh/containers:sc21_tutorial` docker container. On Perlmutter, docker containers are run via [shifter](https://docs.nersc.gov/development/shifter/), and this container is already downloaded and automatically invoked by our job submission scripts. Our container is based on the [NVIDIA ngc 20.10 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel_21-10.html#rel_21-10), with a few additional packages added. See the dockerfile in [`docker/Dockerfile`](docker/Dockerfile) for details.
+The code can be run using the `romerojosh/containers:sc21_tutorial` docker container. On Perlmutter, docker containers are run via [shifter](https://docs.nersc.gov/development/shifter/), and this container is already downloaded and automatically invoked by our job submission scripts. Our container is based on the [NVIDIA ngc 21.10 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel_21-10.html#rel_21-10), with a few additional packages added. See the dockerfile in [`docker/Dockerfile`](docker/Dockerfile) for details.
 
 ### Installing Nsight Systems
 In this tutorial, we will be generating profile files using NVIDIA Nsight Systems on the remote systems. In order to open and view these
@@ -81,20 +90,20 @@ First, let us look at the performance of the training script without optimizatio
 
 On Perlmutter for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3
 ```
 `submit_pm.sh` is a batch submission script that defines resources to be requested by SLURM as well as the command to run.
 Note that any arguments for `train.py`, such as the desired config (`--config`), can be added after `submit_pm.sh` when submitting, and they will be passed to `train.py` properly.
 When using batch submission, you can see the job output by viewing the file `pm-crop64-<jobid>.out` in the submission
 directory. You can find the job id of your job using the command `squeue --me` and looking at the first column of the output.
 
-For interactive jobs, you can run the Python script directly using the following command:
+For interactive jobs, you can run the Python script directly using the following command (**NOTE: please don't run training on the Perlmutter login nodes**):
 ```
-$ python train.py --config=short --num_epochs 3
+python train.py --config=short --num_epochs 3
 ```
 For V100 systems, you will likely need to update the config to reduce the local batch size to 32 due to the reduced memory capacity. Otherwise, instructions are the same.
 
-This will run 3 epochs of training on a single GPU using a default batch size of 64 (or 32 if using the V100 configuration).
+This will run 3 epochs of training on a single GPU using a default batch size of 64.
 See [`config/UNet.yaml`](config/UNet.yaml) for specific configuration details.
 Note we will use the default batch size for the optimization work in the next section
 and will push beyond to larger batch sizes in the distributed training section.
@@ -135,15 +144,15 @@ We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.
 
 To generate a profile using our scripts on Perlmutter, run the following command: 
 ```
-$ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --config=short --num_epochs 2 --enable_manual_profiling
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --config=short --num_epochs 2 --enable_manual_profiling
 ```
 If running interactively, this is the full command from the batch submission script:
 ```
-$ nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=short --num_epochs 2 --enable_manual_profiling
+nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=short --num_epochs 2 --enable_manual_profiling
 ```
 This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file `baseline.qdrep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
 
-Loading this profile ([`baseline.qdrep`](sample_nsys_files/baseline.qdrep)) in Nsight Systems will look like this:
+Loading this profile ([`baseline.qdrep`](sample_nsys_profiles/baseline.qdrep)) in Nsight Systems will look like this:
 ![NSYS Baseline](tutorial_images/nsys_baseline.png)
 
 From this zoomed out view, we can see a lot idle gaps between iterations. These gaps are due to the data loading, which we will address in the next section.
@@ -157,11 +166,11 @@ As an alternative to manually specifying NVTX ranges, we've included the use of 
 
 To run using using benchy on Perlmutter, use the following command: 
 ```
-$ sbatch -n1 submit_pm.sh --config=short --num_epochs 10 --enable_benchy
+sbatch -n1 submit_pm.sh --config=short --num_epochs 10 --enable_benchy
 ```
 If running interactively:
 ```
-$ python train.py --config=short ---num_epochs 10 -enable_benchy
+python train.py --config=short ---num_epochs 10 -enable_benchy
 ```
 benchy uses epoch boundaries to separate the test trials it runs, so in these cases we increase the epoch limit to 10 to ensure the full experiment runs.
 
@@ -188,11 +197,11 @@ of workers improves performance.
 
 We can run this experiment on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers <value of your choice>
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers <value of your choice>
 ```
 If running interactively:
 ```
-$ python train.py --config=short --num_epochs 3 --num_data_workers <value of your choice>
+python train.py --config=short --num_epochs 3 --num_data_workers <value of your choice>
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and 4 data workers:
@@ -246,7 +255,7 @@ This is the performance of the training script for the first three epochs on a 4
 Increasing the number of workers to 8 improves performance to around 270 samples per second, while increasing to 16 workers causes a slight reduction from this.
 
 We can run the 8 worker configuration through profiler using the instructions in the previous section with the added `--num_data_workers`
-argument and load that profile in Nsight Systems. This is what this profile ([`8workers.qdrep`](sample_nsys_files/8workers.qdrep)) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([`8workers.qdrep`](sample_nsys_profiles/8workers.qdrep)) looks like:
 ![NSYS Native Data](tutorial_images/nsys_nativedata_8workers.png)
 
 and zoomed in:
@@ -282,11 +291,11 @@ argument `--data_loader_config=dali-lowmem` to the training script.
 
 We can run this experiment on Perlmutter using DALI with 4 worker threads by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 If running interactively:
 ```
-$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and DALI:
@@ -306,7 +315,7 @@ This is the performance of the training script for the first three epochs on a 4
 ```
 
 We can run the DALI case through profiler using the instructions in the earlier section with the added `--data_loader_config=dali-lowmem`
-argument and load that profile in Nsight Systems. This is what this profile ([`dali.qdrep`](sample_nsys_files/dali.qdrep)) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([`dali.qdrep`](sample_nsys_profiles/dali.qdrep)) looks like:
 ![NSYS DALI](tutorial_images/nsys_dali.png)
 
 and zoomed in to a single iteration:
@@ -337,7 +346,7 @@ The `torch.cuda.amp.autocast` context manager handles converting model operation
 As a quick note, the A100 GPUs we've been using to report results thus far have been able to benefit from Tensor Core compute via the use of TF32 precision operations, enabled by default for CUDNN and CUBLAS in PyTorch. We can measure the benefit of TF32 precision usage on the A100 GPU by temporarily disabling it via setting the environment variable `NVIDIA_TF32_OVERRIDE=0`.  
 We can run this experiment on Perlmutter by running the following command:
 ```
-$ NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
 ```
 yields the following result for 3 epochs:
 ```
@@ -360,11 +369,11 @@ as TF32 is a compute type only, leaving all data in full precision FP32. FP16 pr
 
 We can run this experiment using AMP on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
 ```
 If running interactively:
 ```
-$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
+python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP:
@@ -384,7 +393,7 @@ This is the performance of the training script for the first three epochs on a 4
 ```
 
 We can run the case with AMP enabled through profiler using the instructions in the earlier section with the added `--data_loader_config=enable_amp`
-argument and load that profile in Nsight Systems. This is what this profile ([`dali_amp.qdrep`](sample_nsys_files/dali_amp.qdrep)) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([`dali_amp.qdrep`](sample_nsys_profiles/dali_amp.qdrep)) looks like:
 ![NSYS DALI AMP](tutorial_images/nsys_dali_amp.png)
 
 and zoomed in to a single iteration:
@@ -410,11 +419,11 @@ reuse. We can enabled the use of the `FusedAdam` optimizer in our training scrip
 
 We can run this experiment using APEX on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
 ```
 If running interactively:
 ```
-$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
+python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP, and APEX:
@@ -438,11 +447,11 @@ JIT compilation, done in our training script via the flag `--enable_jit`.
 
 We can run this experiment using JIT on Perlmutter by running the following command:
 ```
-$ sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
 ```
 If running interactively:
 ```
-$ python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
+python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
 ```
 
 This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP, APEX and JIT:
@@ -461,7 +470,7 @@ This is the performance of the training script for the first three epochs on a 4
 2021-11-09 20:23:03,665 - root - INFO -   Total validation time: 0.7198197841644287 sec
 ```
 
-Running a profile ([`dali_amp_apex_jit.qdrep`](sample_nsys_files/dali_amp_apex_jit.qdrep)) using these new options and loading in Nsight Systems looks like this:
+Running a profile ([`dali_amp_apex_jit.qdrep`](sample_nsys_profiles/dali_amp_apex_jit.qdrep)) using these new options and loading in Nsight Systems looks like this:
 ![NSYS DALI AMP APEX JIT](tutorial_images/nsys_dali_amp_apex_jit.png)
 
 and zoomed in to a single iteration:
@@ -481,6 +490,13 @@ PyTorch's new CUDA Graphs functionality to the existing model and training loop.
 much using CUDA Graphs, but for models with more CPU latency issues (e.g. from many small kernel launches), CUDA graphs are 
 something to consider to improve. Compare [train.py](train.py) and [train_graphs.py](train_graphs.py) to see
 how to use CUDA Graphs in PyTorch.
+
+### Full training with optimizations
+Now you can run the full model training on a single GPU with our optimizations. For convenience, we provide a configuration with the optimizations already enabled. Submit the full training with:
+
+```
+sbatch -n 1 -t 40 ./submit_pm.sh --config=bs64_opt
+```
 
 ## Distributed GPU training
 
@@ -597,7 +613,7 @@ Using the optimized options for compute and I/O, we profile the communication ba
 ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_baseline sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling
 ```
 Considering both the case of strong scaling and large-batch training limitation, the 
-`local_batch_size`, i.e. per GPU batch size, is set to 16 to show the effect of communication. The profile looks like: 
+`local_batch_size`, i.e. per GPU batch size, is set to 16 to show the effect of communication. Loading this profile ([`4gpu_baseline.qdrep`](sample_nsys_profiles/4gpu_baseline.qdrep)) in Nsight Systems will look like this: 
 ![NSYS 4gpu_Baseline](tutorial_images/nsys_4gpu_baseline.png)
 where the stream 20 shows the NCCL communication calls. 
 
@@ -633,7 +649,7 @@ Since there is no batch norm layer in our model, it's safe to disable the `broad
 ```
 ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_nobroadcast sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers
 ```
-The profile looks like:
+Loading this profile ([`4gpu_nobroadcast.qdrep`](sample_nsys_profiles/4gpu_nobroadcast.qdrep)) in Nsight Systems will look like this:
 ![NSYS 4gpu_nobroadcast](tutorial_images/nsys_4gpu_nobroadcast.png)
 The per step timing is slightly improved comparing to the baseline. 
 
@@ -659,7 +675,7 @@ default value in PyTorch is 25 mb. We profile a run with 100 mb bucket size with
 ```
 ENABLE_PROFILING=1 PROFILE_OUTPUT=4gpu_bucket100mb sbatch -n 4 ./submit_pm.sh --config=bs64_opt --num_epochs 4 --num_data_workers 8 --local_batch_size 16 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100
 ```
-The profile looks like (zoomed in to a single iteration):
+Loading this profile ([`4gpu_bucketcap100mb.qdrep`](sample_nsys_profiles/4gpu_bucketcap100mb.qdrep)) in Nsight Systems (zoomed in to a single iteration) will look like this:
 ![NSYS 4gpu_bucketcap100mb_zoomed](tutorial_images/nsys_4gpu_bucketcap100mb_zoomed.png)
 the total number of NCCL calls per step now reduced to 5. 
 
@@ -721,6 +737,7 @@ and the performance of the run:
 Note that the batch size is set to a small value to tune the knobs at smaller scale. To have a better scaliing efficiency, we
  want to increase the per GPU compute intensity by increasing the per GPU batch size. 
 
+## Putting it all together
 
 With all of our multi-GPU settings and optimizations in place, we now leave it to you to take what you've learned and try to achieve the best performance on this problem. Specifically, try to further tune things to either reach the lowest possible validation loss, or converge to the single-GPU validation loss (`~4.7e-3`) in the shortest amount of time. Some ideas for things to adjust are:
 * Further tune `num_epochs` to adjust how long it takes for learning rate to decay, and for training to conclude.
