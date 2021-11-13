@@ -726,6 +726,7 @@ and the performance of the run:
 Note that the batch size is set to a small value to tune the knobs at smaller scale. To have a better scaliing efficiency, we
  want to increase the per GPU compute intensity by increasing the per GPU batch size. 
 
+## Putting it all together
 
 With all of our multi-GPU settings and optimizations in place, we now leave it to you to take what you've learned and try to achieve the best performance on this problem. Specifically, try to further tune things to either reach the lowest possible validation loss, or converge to the single-GPU validation loss (`~4.7e-3`) in the shortest amount of time. Some ideas for things to adjust are:
 * Further tune `num_epochs` to adjust how long it takes for learning rate to decay, and for training to conclude.
