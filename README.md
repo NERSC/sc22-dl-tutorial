@@ -92,7 +92,7 @@ python train.py --config=short --num_epochs 3
 ```
 For V100 systems, you will likely need to update the config to reduce the local batch size to 32 due to the reduced memory capacity. Otherwise, instructions are the same.
 
-This will run 3 epochs of training on a single GPU using a default batch size of 64 (or 32 if using the V100 configuration).
+This will run 3 epochs of training on a single GPU using a default batch size of 64.
 See [`config/UNet.yaml`](config/UNet.yaml) for specific configuration details.
 Note we will use the default batch size for the optimization work in the next section
 and will push beyond to larger batch sizes in the distributed training section.
