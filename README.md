@@ -17,9 +17,11 @@ Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invi
 
 ### Software environment
 
-Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter-dl.nersc.gov](http://jupyter-dl.nersc.gov). Visiting that URL will open up a JupyterHub session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
+Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter.nersc.gov](http://jupyter.nersc.gov). 
+Training account setup instructions will be given during the session. Once you have your provided account credentials, you can log in to Jupyter via the link (leave the OTP field blank when logging into Jupyter).
+Once logged into the hub, start a session by clicking the button for Perlmutter Shared CPU Node (other options will not work with this tutorial material). This will open up a session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
-Training account setup instructions will be given during the session. Use your provided account credentials and log in to Jupyter. Start a terminal and clone this repository with
+To begin, launch a terminal from Jupyter and clone this repository with
 ```
 git clone https://github.com/NERSC/sc21-dl-tutorial.git
 ```
