@@ -86,7 +86,7 @@ Note that any arguments for `train.py`, such as the desired config (`--config`),
 When using batch submission, you can see the job output by viewing the file `pm-crop64-<jobid>.out` in the submission
 directory. You can find the job id of your job using the command `squeue --me` and looking at the first column of the output.
 
-For interactive jobs, you can run the Python script directly using the following command:
+For interactive jobs, you can run the Python script directly using the following command (**NOTE: please don't run training on the Perlmutter login nodes**):
 ```
 $ python train.py --config=short --num_epochs 3
 ```
