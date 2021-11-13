@@ -119,7 +119,7 @@ cp -r ./example_logs/base $SCRATCH/sc21-dl-tutorial/logs
 To view results in TensorBoard, open the [`start_tensorboard.ipynb`](start_tensorboard.ipynb) notebook and follow the instructions in it to launch a TensorBoard session in your browser. Once you have TensorBoard open, you should see a dashboard with data for the loss values, learning rate, and average iterations per second. Looking at the validation loss for the `base` config, you should see the following training curve:
 ![baseline training](tutorial_images/baseline_tb.png)
 
-As the training just launched earlier runs, it should also dump data to a TensorBoard directory in the `logs` path, and TensorBoard will parse the data and display it for you You can hit the refresh button in the upper-right corner of TensorBoard to update the plots with the latest data.
+As our training with the `short` config runs, it should also dump the training metrics to the TensorBoard directory, and TensorBoard will parse the data and display it for you. You can hit the refresh button in the upper-right corner of TensorBoard to update the plots with the latest data.
 
 ## Single GPU performance profiling and optimization
 
