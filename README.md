@@ -113,7 +113,7 @@ We want to compare our training results against the `base` config baseline, and 
 To copy the example TensorBoard log to the scratch directory where our training jobs will output their logs, do
 ```
 mkdir -p $SCRATCH/sc21-dl-tutorial/logs
-cp ./example_logs/base $SCRATCH/sc21-dl-tutorial/logs
+cp -r ./example_logs/base $SCRATCH/sc21-dl-tutorial/logs
 ```
 
 To view results in TensorBoard, open the [`start_tensorboard.ipynb`](start_tensorboard.ipynb) notebook and follow the instructions in it to launch a TensorBoard session in your browser. Once you have TensorBoard open, you should see a dashboard with data for the loss values, learning rate, and average iterations per second. Looking at the validation loss for the `base` config, you should see the following training curve:
