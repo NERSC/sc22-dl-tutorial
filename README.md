@@ -6,6 +6,12 @@ This repository contains the example code material for the SC21 tutorial:
 **Contents**
 * [Links](#links)
 * [Installation](#installation-and-setup)
+* [Model, data, and code overview](#model-data-and-training-code-overview)
+* [Single GPU training](#single-gpu-training)
+* [Single GPU performance](#single-gpu-performance-profiling-and-optimization)
+* [Distributed training](#distributed-gpu-training)
+* [Multi GPU performance](#multi-gpu-performance-profiling-and-optimization)
+* [Putting it all together](#putting-it-all-together)
 
 ## Links
 
