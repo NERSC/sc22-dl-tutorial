@@ -29,7 +29,7 @@ Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter.
 Training account setup instructions will be given during the session. Once you have your provided account credentials, you can log in to Jupyter via the link (leave the OTP field blank when logging into Jupyter).
 Once logged into the hub, start a session by clicking the button for Perlmutter Shared CPU Node (other options will not work with this tutorial material). This will open up a session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
-To begin, start a terminal and clone this repository to your scratch directory with the following:
+To begin, start a terminal from JupyterHub and clone this repository with:
 ```
 git clone https://github.com/NERSC/sc21-dl-tutorial.git
 ```
