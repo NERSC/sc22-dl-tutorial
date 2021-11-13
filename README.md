@@ -97,8 +97,13 @@ See [`config/UNet.yaml`](config/UNet.yaml) for specific configuration details.
 Note we will use the default batch size for the optimization work in the next section
 and will push beyond to larger batch sizes in the distributed training section.
 
-In the baseline configuration, the model converges to about ??% accuracy on
-the validation dataset in about 80 epochs:
+In the baseline configuration, the model converges to a loss of about `4.7e-3` on
+the validation dataset in 10 epochs. This takes around 2 hours to run, so we have already included the TensorBoard log for the `base` config in the `logs` directory for you. 
+
+To view results in TensorBoard, open the [`start_tensorboard.ipynb`](start_tensorboard.ipynb) notebook and follow the instructions in it to launch a TensorBoard session in your browser. Once you have TensorBoard open, you should see a dashboard with data for the loss values, learning rate, and average iterations per second. Looking at the validation loss for the `base` config, you should see the following training curve:
+![baseline training](tutorial_images/baseline_tb.png)
+
+As the training just launched earlier runs, it should also dump data to a TensorBoard directory in the `logs` path, and TensorBoard will parse the data and display it for you You can hit the refresh button in the upper-right corner of TensorBoard to update the plots with the latest data.
 
 ## Single GPU performance profiling and optimization
 
@@ -509,17 +514,15 @@ weights in the distributed setting.
 
 ### Large batch convergence
 
-#### NOTE: Figs here are placeholders, need to annotate/polish them
-
 To speed up training, we try to use larger batch sizes, spread across more GPUs,
 with larger learning rates. The base config uses a batchsize of 64 for single-GPU training, so we will set `base_batch_size=64` in our configs and then increase the `global_batch_size` parameter in increments of 64 for every additional GPU we add to the distributed training. Then, we can take the ratio of `global_batch_size` and `base_batch_size` to decide how much to scale up the learning rate as the global batch size grows. In this section, we will make use of the square-root scaling rule, which multiplies the base initial learning rate by `sqrt(global_batch_size/base_batch_size)`. Take a look at [`utils/__init__.py`](utils/__init__.py) to see how this is implemented.
 
 As a first attempt, let's try increasing the batchsize from 64 to 512, distributing our training across 8 GPUs (thus two GPU nodes on Perlmutter). To submit a job with this config, do
 ```
-sbatch -t 20 -n 8 submit_pm.sh --config=bs512_test
+sbatch -t 10 -n 8 submit_pm.sh --config=bs512_test
 ```
 
-Looking at the TensorBoard log, we can see that the rate of convergence is greatly increased initially, but the validation loss plateaus quickly and our final accuracy ends up worse than the single-GPU training:
+Looking at the TensorBoard log, we can see that the rate of convergence is increased initially, but the validation loss plateaus quickly and our final accuracy ends up worse than the single-GPU training:
 ![batchsize 512 bad](tutorial_images/bs512_short.png)
 
 From the plot, we see that with a global batch size of 512 we complete each epoch in a much shorter amount of time, so training concludes rapidly. This affects our learning rate schedule, which depends on the total number of steps as set in `train.py`:
@@ -531,22 +534,22 @@ If we increase the total number of epochs, we will run longer (thus giving the m
 ```
 sbatch -t 20 -n 8 submit_pm.sh --config=bs512_opt
 ```
-With the longer training, we can see that our higher batch size results are actually better than the baseline configuration. Furthermore, the minimum in the loss is reached sooner, despite running for more epochs:
+With the longer training, we can see that our higher batch size results are slightly better than the baseline configuration. Furthermore, the minimum in the loss is reached sooner, despite running for more epochs:
 ![batchsize 512 good](tutorial_images/bs512.png)
 
-Based on our findings, we can strategize to have trainings with larger batch sizes run for at least half as many total iterations as the baseline, as a rule of thumb. You can see this imlemented in the different configs for various global batchsizes: `bs256_opt`, `bs512_opt`, `bs2048_opt`. Comparing results between these configs, we see all of them improve over the baseline, and the rate of convergence improves as we add more GPUs and increase the global batch size:
+Based on our findings, we can strategize to have trainings with larger batch sizes run for half as many total iterations as the baseline, as a rule of thumb. You can see this imlemented in the different configs for various global batchsizes: `bs256_opt`, `bs512_opt`, `bs2048_opt`. However, to really compare how our convergence is improving between these configurations, we must consider the actual time-to-solution. To do this in TensorBoard, select the "Relative" option on the left-hand side, which will change the x-axis in each plot to show walltime of the job (in hours), relative to the first data point:
+
+![relative option for tensorboard](tutorial_images/relative.png)
+
+With this selected, we can compare results between these different configs as a function of time, and see that all of them improve over the baseline. Furthermore, the rate of convergence improves as we add more GPUs and increase the global batch size:
+
 ![comparison across batchsizes](tutorial_images/bs_compare.png)
 
+Based on our study, we see that scaling up our U-Net can definitely speed up training and reduce time-to-solution. Compared to our un-optimized single-GPU baseline from the first section, which took around 2 hours to train, we can now converge in about 10 minutes, which is a great speedup! We have also seen that there are several considerations to be aware of and several key hyperparameters to tune. We encourage you to now play with some of these settings and observe how they can affect the results. The main parameters in `config/UNet.yaml` to consider are:
 
-We can now try to go even further, and see what happens with a global batchsize of 8192, running with 128 GPUs. We find that the rule of thumb from before does not hold as well here; the training starts okay, but then diverges after some number of iterations. In this case, reducing the total number of epochs (to decay the learning rate faster) does the trick.
-![big batchsize](tutorial_images/bs8192.png)
-
-Based on our study, we see that scaling up our U-Net can definitely speed up training and reduce time-to-solution, but there are several considerations to be aware of and several key hyperparameters to tune. Now, we leave it to you to try to further tune things and reach the lowest possible validation loss, or achieve the single-GPU validation loss (`~4.7e-3`) in the shortest amount of time. Some ideas for things to adjust are:
-* Further tune `num_epochs` to adjust how long it takes for learning rate to decay, and for training to conclude.
-* Play with the learning rate: try out a different scaling rule, such as linear scale-up of learning rate, or come up with your own learning rate schedule.
-* Change other components, such as the optimizer used. Here we have used the standard Adam optimizer, but many practitioners also use the SGD optimizer (with momentum) in distributed training.
-
-The [PyTorch docs](https://pytorch.org/docs/stable/index.html) will be helpful if you are attempting more advanced changes.
+* `num_epochs`, to adjust how long it takes for learning rate to decay and for training to conclude.
+* `lr_schedule`, to choose how to scale up learning rate, or change the start and end learning rates.
+* `global_batch_size`. We ask that you limit yourself to a maximum of 8 GPUs initially for this section, to ensure everyone gets sufficient access to compute resources.
 
 
 ## Multi-GPU performance profiling and optimization
@@ -716,3 +719,10 @@ and the performance of the run:
 Note that the batch size is set to a small value to tune the knobs at smaller scale. To have a better scaliing efficiency, we
  want to increase the per GPU compute intensity by increasing the per GPU batch size. 
 
+
+With all of our multi-GPU settings and optimizations in place, we now leave it to you to take what you've learned and try to achieve the best performance on this problem. Specifically, try to further tune things to either reach the lowest possible validation loss, or converge to the single-GPU validation loss (`~4.7e-3`) in the shortest amount of time. Some ideas for things to adjust are:
+* Further tune `num_epochs` to adjust how long it takes for learning rate to decay, and for training to conclude.
+* Play with the learning rate: try out a different scaling rule, such as linear scale-up of learning rate, or come up with your own learning rate schedule.
+* Change other components, such as the optimizer used. Here we have used the standard Adam optimizer, but many practitioners also use the SGD optimizer (with momentum) in distributed training.
+
+The [PyTorch docs](https://pytorch.org/docs/stable/index.html) will be helpful if you are attempting more advanced changes.
