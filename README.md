@@ -519,11 +519,13 @@ on the distributed package: https://pytorch.org/docs/stable/distributed.html
 
 ### Code basics
 
-To submit a multi-GPU job, use the `submit_pm.sh` with the `-n` option set to the desired number of GPUs. For example, to launch a training with 4 GPUs (which is all available GPUs on each Perlmutter GPU node), do
+To submit a multi-GPU job, use the `submit_pm.sh` with the `-n` option set to the desired number of GPUs. For example, to launch a training with 4 GPUs (which is all available GPUs on each Perlmutter GPU node), you will use commands like:
 ```
-sbatch -n 4 submit_pm.sh
+sbatch -n 4 submit_pm.sh [OPTIONS]
 ```
 This script automatically uses the slurm flags `--ntasks-per-node 4`, `--cpus-per-task 32`, `--gpus-per-task 1`, so slurm will allocate one process for each GPU we request, and give each process 1/4th of the CPU resources available on a Perlmutter GPU node. This way, multi-node trainings can easily be launched simply by setting `-n` greater than 4.
+
+*Question: why do you think we run 1 task (cpu process) per GPU, instead of 1 task per node (each running 4 GPUs)?*
 
 PyTorch `DistributedDataParallel`, or DDP for short, is flexible and can initialize process groups with a variety of methods. For this code, we will use the standard approach of initializing via environment variables, which can be easily read from the slurm environment. Take a look at the `export_DDP_vars.sh` helper script, which is used by our job script to expose for PyTorch DDP the global rank and node-local rank of each process, along with the total number of ranks and the address and port to use for network communication. In the [`train.py`](train.py) script, near the bottom in the main script execution, we set up the distributed backend using these environment variables via `torch.distributed.init_proces_group`.
 
@@ -540,10 +542,16 @@ initial model weights to all workers and performing all-reduce on the gradients
 in the training backward pass to properly synchronize and update the model
 weights in the distributed setting.
 
+*Question: why does DDP broadcast the initial model weights to all workers? What would happen if it didn't?*
+
 ### Large batch convergence
 
 To speed up training, we try to use larger batch sizes, spread across more GPUs,
 with larger learning rates. The base config uses a batchsize of 64 for single-GPU training, so we will set `base_batch_size=64` in our configs and then increase the `global_batch_size` parameter in increments of 64 for every additional GPU we add to the distributed training. Then, we can take the ratio of `global_batch_size` and `base_batch_size` to decide how much to scale up the learning rate as the global batch size grows. In this section, we will make use of the square-root scaling rule, which multiplies the base initial learning rate by `sqrt(global_batch_size/base_batch_size)`. Take a look at [`utils/__init__.py`](utils/__init__.py) to see how this is implemented.
+
+*Question: how do you think the loss curves would change if we didn't increase the learning rate at all as we scale up?*
+
+*Question: what do you think would happen if we simply increased our learning rate without increasing batch size?*
 
 As a first attempt, let's try increasing the batchsize from 64 to 512, distributing our training across 8 GPUs (thus two GPU nodes on Perlmutter). To submit a job with this config, do
 ```
@@ -579,6 +587,9 @@ Based on our study, we see that scaling up our U-Net can definitely speed up tra
 * `lr_schedule`, to choose how to scale up learning rate, or change the start and end learning rates.
 * `global_batch_size`. We ask that you limit yourself to a maximum of 8 GPUs initially for this section, to ensure everyone gets sufficient access to compute resources.
 
+You should also consider the following questions:
+* *What are the limitations to scaling up batch size and learning rates?*
+* *What would happen to the learning curves and runtime if we did "strong scaling" instead (hold global batch size fixed as we increase GPUs, and respectively decrease the local batch size)?*
 
 ## Multi-GPU performance profiling and optimization
 
