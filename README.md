@@ -23,6 +23,8 @@ Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invi
 
 NERSC JupyterHub: https://jupyter.nersc.gov
 
+Data download: https://portal.nersc.gov/project/dasrepo/pharring/
+
 ## Installation and Setup
 
 ### Software environment
@@ -85,7 +87,8 @@ Based on the selected configuration, the train script will then:
 Besides the `train.py` script, we have a slightly more complex [`train_graph.py`](train_graph.py)
 script, which implements the same functionality with added capability for using the CUDA Graphs APIs introduced in PyTorch 1.10. This topic will be covered in the [Single GPU performance profiling and optimization](#Single-GPU-performance-profiling-and-optimization) section.
 
-More info on the model and data can be found in the [slides](https://drive.google.com/drive/u/1/folders/1Ei56_HDjLMPbdLq9QdQhoxN3J1YdzZw0).
+More info on the model and data can be found in the [slides](https://drive.google.com/drive/u/1/folders/1Ei56_HDjLMPbdLq9QdQhoxN3J1YdzZw0). If you are experimenting with this repository after the tutorial date, you can download the data from here: https://portal.nersc.gov/project/dasrepo/pharring/.
+Note that you will have to adjust the data path in `submit_pm.sh` to point yor personal copy after downloading.
 
 
 ## Single GPU training
