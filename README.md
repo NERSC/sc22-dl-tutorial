@@ -21,11 +21,13 @@ Tutorial presentation videos: https://drive.google.com/drive/folders/1TGV6N2Dpj6
 
 Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invite/zt-yma1xh4z-D5cOLy4F~ZzVfNkNg96P3A
 
+NERSC JupyterHub: https://jupyter.nersc.gov
+
 ## Installation and Setup
 
 ### Software environment
 
-Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter.nersc.gov](http://jupyter.nersc.gov). 
+Access to NERSC's Perlmutter machine is provided for this tutorial via [jupyter.nersc.gov](https://jupyter.nersc.gov). 
 Training account setup instructions will be given during the session. Once you have your provided account credentials, you can log in to Jupyter via the link (leave the OTP field blank when logging into Jupyter).
 Once logged into the hub, start a session by clicking the button for Perlmutter Shared CPU Node (other options will not work with this tutorial material). This will open up a session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
