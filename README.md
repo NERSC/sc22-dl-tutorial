@@ -495,10 +495,10 @@ BENCHY::SUMMARY::FULL average trial throughput: 538.593 +/- 0.193
 We see a modest gain in the `SYNTHETIC` throughput, resuling in a slight increase in the `FULL` throughput.
 
 ### Using CUDA Graphs (optional)
-In this repository, we've included an alternative training script [train_graphs.py](train_graphs.py) that illustrates applying
+In this repository, we've included an alternative training script [train_graph.py](train_graph.py) that illustrates applying
 PyTorch's new CUDA Graphs functionality to the existing model and training loop. Our tutorial model configuration does not benefit
 much using CUDA Graphs, but for models with more CPU latency issues (e.g. from many small kernel launches), CUDA graphs are 
-something to consider to improve. Compare [train.py](train.py) and [train_graphs.py](train_graphs.py) to see
+something to consider to improve. Compare [train.py](train.py) and [train_graph.py](train_graph.py) to see
 how to use CUDA Graphs in PyTorch.
 
 ### Full training with optimizations
