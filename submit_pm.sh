@@ -1,7 +1,6 @@
 #!/bin/bash 
 #SBATCH -C gpu 
 #SBATCH -A ntrain4_g
-#SBATCH -q debug
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-task 1
