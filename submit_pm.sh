@@ -1,12 +1,12 @@
 #!/bin/bash 
 #SBATCH -C gpu 
 #SBATCH -A ntrain4_g
-#SBATCH -q debug
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-task 1
 #SBATCH --time=0:10:00
 #SBATCH --image=romerojosh/containers:sc21_tutorial
+#SBATCH --reservation=sc21_tutorial_01
 #SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
 
