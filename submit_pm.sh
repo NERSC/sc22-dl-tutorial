@@ -7,6 +7,7 @@
 #SBATCH --gpus-per-task 1
 #SBATCH --time=0:10:00
 #SBATCH --image=romerojosh/containers:sc21_tutorial
+#SBATCH --reservation=sc21_tutorial_01
 #SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
 
