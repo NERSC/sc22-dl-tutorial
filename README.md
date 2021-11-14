@@ -519,9 +519,9 @@ on the distributed package: https://pytorch.org/docs/stable/distributed.html
 
 ### Code basics
 
-To submit a multi-GPU job, use the `submit_pm.sh` with the `-n` option set to the desired number of GPUs. For example, to launch a training with 4 GPUs (which is all available GPUs on each Perlmutter GPU node), you will use commands like:
+To submit a multi-GPU job, use the `submit_pm.sh` with the `-n` option set to the desired number of GPUs. For example, to launch a training with multiple GPUs, you will use commands like:
 ```
-sbatch -n 4 submit_pm.sh [OPTIONS]
+sbatch -n NUM_GPU submit_pm.sh [OPTIONS]
 ```
 This script automatically uses the slurm flags `--ntasks-per-node 4`, `--cpus-per-task 32`, `--gpus-per-task 1`, so slurm will allocate one process for each GPU we request, and give each process 1/4th of the CPU resources available on a Perlmutter GPU node. This way, multi-node trainings can easily be launched simply by setting `-n` greater than 4.
 
