@@ -32,10 +32,13 @@ Training account setup instructions will be given during the session. Once you h
 Once logged into the hub, start a session by clicking the button for Perlmutter Shared CPU Node (other options will not work with this tutorial material). This will open up a session on a Perlmutter login node, from which you can submit jobs to the GPU nodes and monitor their progress.
 
 To begin, start a terminal from JupyterHub and clone this repository with:
-```
+```bash
 git clone https://github.com/NERSC/sc21-dl-tutorial.git
 ```
-You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository (`cd sc21-dl-tutorial`).
+You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository. In your terminal, change to the directory with
+```bash
+cd sc21-dl-tutorial
+```
 
 For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain4` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically as is, but if you submit your own custom jobs via `salloc` or `sbatch` you must include the following flags for slurm:
 * `-A ntrain4_g` is required for training accounts
