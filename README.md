@@ -526,7 +526,7 @@ To submit a multi-GPU job, use the `submit_pm.sh` with the `-n` option set to th
 ```
 sbatch -n NUM_GPU submit_pm.sh [OPTIONS]
 ```
-This script automatically uses the slurm flags `--ntasks-per-node 4`, `--cpus-per-task 32`, `--gpus-per-task 1`, so slurm will allocate one process for each GPU we request, and give each process 1/4th of the CPU resources available on a Perlmutter GPU node. This way, multi-node trainings can easily be launched simply by setting `-n` greater than 4.
+This script automatically uses the slurm flags `--ntasks-per-node 4`, `--cpus-per-task 32`, `--gpus-per-node 4`, so slurm will allocate all the CPUs and GPUs available on each Perlmutter GPU node, and launch one process for each GPU in the job. This way, multi-node trainings can easily be launched simply by setting `-n` to multiples of 4.
 
 *Question: why do you think we run 1 task (cpu process) per GPU, instead of 1 task per node (each running 4 GPUs)?*
 
