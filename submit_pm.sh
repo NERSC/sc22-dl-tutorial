@@ -3,7 +3,7 @@
 #SBATCH -A ntrain4_g
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
-#SBATCH --gpus-per-task 1
+#SBATCH --gpus-per-node 4
 #SBATCH --time=0:10:00
 #SBATCH --image=romerojosh/containers:sc21_tutorial
 #SBATCH -J pm-crop64
