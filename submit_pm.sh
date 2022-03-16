@@ -32,6 +32,7 @@ BENCHY_CONFIG=benchy-conf.yaml
 BENCHY_OUTPUT=${BENCHY_OUTPUT:-"benchy_output"}
 sed "s/.*output_filename.*/        output_filename: ${BENCHY_OUTPUT}.json/" ${BENCHY_CONFIG} > benchy-run-${SLURM_JOBID}.yaml
 export BENCHY_CONFIG_FILE=benchy-run-${SLURM_JOBID}.yaml
+export MASTER_ADDR=$(hostname)
 
 set -x
 srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \
