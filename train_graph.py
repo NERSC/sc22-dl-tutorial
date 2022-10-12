@@ -234,7 +234,7 @@ if __name__ == '__main__':
   parser.add_argument("--run_num", default='00', type=str, help='tag for indexing the current experiment')
   parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str, help='path to yaml file containing training configs')
   parser.add_argument("--config", default='base', type=str, help='name of desired config in yaml file')
-  parser.add_argument("--amp_mode", default='none', type=str, choices=['none', 'fp16', 'bf16'], help='select automatic mixed precision mode')
+  parser.add_argument("--amp_mode", default=None, type=str, choices=['none', 'fp16', 'bf16'], help='select automatic mixed precision mode')
   parser.add_argument("--enable_apex", action='store_true', help='enable apex fused Adam optimizer')
   parser.add_argument("--enable_jit", action='store_true', help='enable JIT compilation')
   parser.add_argument("--enable_benchy", action='store_true', help='enable benchy tool usage')
@@ -254,8 +254,10 @@ if __name__ == '__main__':
 
   params = YParams(os.path.abspath(args.yaml_config), args.config)
 
-  # Update config with modified args
-  # select amp dtype
+  # Update config with modified args  
+  # set up amp
+  if args.amp_mode is not None:
+    params.update({"amp_mode": args.amp_mode})
   amp_dtype = None
   if params.amp_mode == "fp16":
     amp_dtype = torch.float16
