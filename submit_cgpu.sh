@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task 10
 #SBATCH --gpus-per-task 1
 #SBATCH --time=0:30:00
-#SBATCH --image=romerojosh/containers:sc21_tutorial
+#SBATCH --image=nersc/sc22-dl-tutorial:latest
 #SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
 

@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/pytorch:22.09-py3
+FROM nvcr.io/nvidia/pytorch:22.10-py3
 
 # Upgrade pip
 RUN python -m pip install -U setuptools pip

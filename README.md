@@ -1,6 +1,6 @@
-# SC21 Deep Learning at Scale Tutorial
+# SC22 Deep Learning at Scale Tutorial
 
-This repository contains the example code material for the SC21 tutorial:
+This repository contains the example code material for the SC22 tutorial:
 *Deep Learning at Scale*.
 
 **Contents**
@@ -35,11 +35,11 @@ Once logged into the hub, start a session by clicking the button for Perlmutter 
 
 To begin, start a terminal from JupyterHub and clone this repository with:
 ```bash
-git clone https://github.com/NERSC/sc21-dl-tutorial.git
+git clone https://github.com/NERSC/sc22-dl-tutorial.git
 ```
 You can use the Jupyter file browser to view and edit source files and scripts. For all of the example commands provided below, make sure you are running them from within the top-level folder of the repository. In your terminal, change to the directory with
 ```bash
-cd sc21-dl-tutorial
+cd sc22-dl-tutorial
 ```
 
 For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain4` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically as is, but if you submit your own custom jobs via `salloc` or `sbatch` you must include the following flags for slurm:
@@ -120,8 +120,8 @@ the validation dataset in 10 epochs. This takes around 2 hours to run, so to sav
 We want to compare our training results against the `base` config baseline, and TensorBoard makes this easy as long as all training runs are stored in the same place. 
 To copy the example TensorBoard log to the scratch directory where our training jobs will output their logs, do
 ```
-mkdir -p $SCRATCH/sc21-dl-tutorial/logs
-cp -r ./example_logs/base $SCRATCH/sc21-dl-tutorial/logs
+mkdir -p $SCRATCH/sc22-dl-tutorial/logs
+cp -r ./example_logs/base $SCRATCH/sc22-dl-tutorial/logs
 ```
 
 To view results in TensorBoard, open the [`start_tensorboard.ipynb`](start_tensorboard.ipynb) notebook and follow the instructions in it to launch a TensorBoard session in your browser. Once you have TensorBoard open, you should see a dashboard with data for the loss values, learning rate, and average iterations per second. Looking at the validation loss for the `base` config, you should see the following training curve:

@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4
 #SBATCH --time=0:10:00
-#SBATCH --image=romerojosh/containers:sc21_tutorial
+#SBATCH --image=nersc/sc22-dl-tutorial:latest
 #SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
 
