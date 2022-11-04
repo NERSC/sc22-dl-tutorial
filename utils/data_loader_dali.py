@@ -90,21 +90,23 @@ class DaliDataLoader(object):
             data_rot = fn.rotate(data,
                                  device = "gpu",
                                  angle = angles,
-                                 axis = axes)
+                                 axis = axes,
+                                 keep_size = True)
 
             label_rot = fn.rotate(label,
                                   device = "gpu",
                                   angle = angles,
-                                  axis = axes)
+                                  axis = axes,
+                                  keep_size = True)
 
             # flip
-            data_rot = fn.flip(data_rot,
+            data_rot = fn.flip(data,
                                device = 'gpu',
                                depthwise = flip[0],
                                horizontal = flip[1],
                                vertical = flip[2])
 
-            label_rot = fn.flip(label_rot,
+            label_rot = fn.flip(label,
                                 device = 'gpu',
                                 depthwise = flip[0],
                                 horizontal = flip[1],

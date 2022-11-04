@@ -9,7 +9,7 @@ base: &base
   Nsamples: 65536
   Nsamples_val: 8192
   num_epochs: 10
-  enable_amp: False
+  amp_mode: none
   enable_apex: False
   enable_benchy: False
   enable_jit: False
@@ -52,7 +52,7 @@ short: &short
 short_opt:
   <<: *short
   data_loader_config: 'dali-lowmem'
-  enable_amp: True
+  amp_mode: fp16
   enable_apex: True
   enable_jit: True
 
@@ -61,7 +61,7 @@ bs64_opt: &bs64_opt
   <<: *base
   data_loader_config: 'dali-lowmem'
   global_batch_size: 64
-  enable_amp: True
+  amp_mode: fp16
   enable_apex: True
   enable_jit: True
 

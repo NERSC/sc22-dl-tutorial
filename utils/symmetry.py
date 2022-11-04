@@ -1,8 +1,9 @@
 import numpy as np
 
 symmetry_dict = {
-    # identity
-    0: ((0,0,0), 0.),
+    # identity: non trivial axis
+    # to not have dev/null error
+    0: ((1,0,0), 0.),
     # faces
     1: ((1,0,0), 90.),
     2: ((1,0,0), 180.),

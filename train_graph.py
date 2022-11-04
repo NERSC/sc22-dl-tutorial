@@ -34,11 +34,11 @@ def capture_model(params, model, loss_func, lambda_rho, scaler, capture_stream, 
   with torch.cuda.stream(capture_stream):
     for _ in range(num_warmup):
       model.zero_grad(set_to_none=True)
-      with autocast(params.enable_amp):
+      with autocast(enabled=params.amp_enabled, dtype=params.amp_dtype):
         static_output = model(static_input)
         static_loss = loss_func(static_output, static_label, lambda_rho)
 
-      if params.enable_amp:
+      if params.amp_dtype == torch.float16:
         scaler.scale(static_loss).backward()
       else:
         static_loss.backward()
@@ -55,19 +55,17 @@ def capture_model(params, model, loss_func, lambda_rho, scaler, capture_stream, 
     # zero grads before capture:
     model.zero_grad(set_to_none=True)
 
-    # start capture
-    graph.capture_begin()
+    # do the capture with the context manager:
+    with torch.cuda.graph(graph):
 
-    with autocast(params.enable_amp):
-      static_output = model(static_input)
-      static_loss = loss_func(static_output, static_label, lambda_rho)
+      with autocast(enabled=params.amp_enabled, dtype=params.amp_dtype): 
+        static_output = model(static_input)
+        static_loss = loss_func(static_output, static_label, lambda_rho)
 
-      if params.enable_amp:
+      if params.amp_dtype == torch.float16:
         scaler.scale(static_loss).backward()
       else:
         static_loss.backward()
-
-    graph.capture_end()
 
   torch.cuda.current_stream().wait_stream(capture_stream)
 
@@ -89,7 +87,7 @@ def train(params, args, local_rank, world_rank, world_size):
   model = UNet.UNet(params).to(device)
   model.apply(model.get_weights_function(params.weight_init))
   
-  if params.enable_amp:
+  if params.amp_dtype == torch.float16:
     scaler = GradScaler()
   else:
     scaler = None
@@ -107,13 +105,6 @@ def train(params, args, local_rank, world_rank, world_size):
     optimizer = optim.Adam(model.parameters(), lr = params.lr_schedule['start_lr'])
 
   if params.enable_jit:
-    torch._C._jit_set_nvfuser_enabled(True)
-    torch._C._jit_set_texpr_fuser_enabled(False)
-    torch._C._jit_override_can_fuse_on_cpu(False)
-    torch._C._jit_override_can_fuse_on_gpu(False)
-    #torch._C._jit_set_profiling_executor(True)
-    #torch._C._jit_set_profiling_mode(True)
-    #torch._C._jit_set_bailout_depth(20)
     model_handle = model.module if params.distributed else model
     model_handle = torch.jit.script(model_handle)  
 
@@ -185,7 +176,7 @@ def train(params, args, local_rank, world_rank, world_size):
       static_label.copy_(tar)
       graph.replay()
 
-      if params.enable_amp:
+      if params.amp_dtype == torch.float16:
         if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"optimizer")
         scaler.step(optimizer)
         if args.enable_manual_profiling: torch.cuda.nvtx.range_pop() # optimizer
@@ -218,7 +209,7 @@ def train(params, args, local_rank, world_rank, world_size):
     if not args.enable_benchy:
       with torch.no_grad():
         for i, data in enumerate(val_data_loader, 0):
-          with autocast(params.enable_amp):
+          with autocast(enabled=params.amp_enabled, dtype=params.amp_dtype):
             inp, tar = map(lambda x: x.to(device), data)
             gen = model(inp)
             loss = loss_func(gen, tar, lambda_rho)
@@ -243,7 +234,7 @@ if __name__ == '__main__':
   parser.add_argument("--run_num", default='00', type=str, help='tag for indexing the current experiment')
   parser.add_argument("--yaml_config", default='./config/UNet.yaml', type=str, help='path to yaml file containing training configs')
   parser.add_argument("--config", default='base', type=str, help='name of desired config in yaml file')
-  parser.add_argument("--enable_amp", action='store_true', help='enable automatic mixed precision')
+  parser.add_argument("--amp_mode", default=None, type=str, choices=['none', 'fp16', 'bf16'], help='select automatic mixed precision mode')
   parser.add_argument("--enable_apex", action='store_true', help='enable apex fused Adam optimizer')
   parser.add_argument("--enable_jit", action='store_true', help='enable JIT compilation')
   parser.add_argument("--enable_benchy", action='store_true', help='enable benchy tool usage')
@@ -263,8 +254,17 @@ if __name__ == '__main__':
 
   params = YParams(os.path.abspath(args.yaml_config), args.config)
 
-  # Update config with modified args
-  params.update({"enable_amp" : args.enable_amp,
+  # Update config with modified args  
+  # set up amp
+  if args.amp_mode is not None:
+    params.update({"amp_mode": args.amp_mode})
+  amp_dtype = None
+  if params.amp_mode == "fp16":
+    amp_dtype = torch.float16
+  elif params.amp_mode == "bf16":
+    amp_dtype = torch.bfloat16
+  params.update({"amp_enabled": amp_dtype is not None,
+                 "amp_dtype" : amp_dtype,
                  "enable_apex" : args.enable_apex,
                  "enable_jit" : args.enable_jit,
                  "enable_benchy" : args.enable_benchy})
