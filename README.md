@@ -42,9 +42,9 @@ cd sc22-dl-tutorial
 
 For running slurm jobs on Perlmutter, we will use training accounts which are provided under the `ntrain4` project. The slurm script `submit_pm.sh` included in the repository is configured to work automatically as is, but if you submit your own custom jobs via `salloc` or `sbatch` you must include the following flags for slurm:
 * `-A ntrain4_g` is required for training accounts
-* `--reservation=sc21_tutorial_01` is required to access the set of GPU nodes we have reserved for the duration of the tutorial.
+* `--reservation=sc22_tutorial` is required to access the set of GPU nodes we have reserved for the duration of the tutorial.
 
-The code can be run using the `romerojosh/containers:sc21_tutorial` docker container. On Perlmutter, docker containers are run via [shifter](https://docs.nersc.gov/development/shifter/), and this container is already downloaded and automatically invoked by our job submission scripts. Our container is based on the [NVIDIA ngc 21.10 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel_21-10.html#rel_21-10), with a few additional packages added. See the dockerfile in [`docker/Dockerfile`](docker/Dockerfile) for details.
+The code can be run using the `nersc/sc22-dl-tutorial` docker container. On Perlmutter, docker containers are run via [shifter](https://docs.nersc.gov/development/shifter/), and this container is already downloaded and automatically invoked by our job submission scripts. Our container is based on the [NVIDIA ngc 22.10 pytorch container](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-22-10.html), with a few additional packages added. See the dockerfile in [`docker/Dockerfile`](docker/Dockerfile) for details.
 
 ### Installing Nsight Systems
 In this tutorial, we will be generating profile files using NVIDIA Nsight Systems on the remote systems. In order to open and view these
