@@ -258,7 +258,7 @@ if __name__ == '__main__':
   # set up amp
   if args.amp_mode is not None:
     params.update({"amp_mode": args.amp_mode})
-  amp_dtype = None
+  amp_dtype = torch.float32
   if params.amp_mode == "fp16":
     amp_dtype = torch.float16
   elif params.amp_mode == "bf16":
