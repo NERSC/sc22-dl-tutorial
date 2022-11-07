@@ -89,3 +89,63 @@ bs8192_opt: # 128 GPUs
   <<: *bs64_opt
   global_batch_size: 8192
   num_epochs: 320
+
+
+#######################################################
+##### Summit configs ##################################
+#######################################################
+
+# A short config for testing/profiling on a single V100
+base_sm: &base_sm
+  <<: *base
+  # Training config
+  global_batch_size: 32 # number of samples per training batch
+  base_batch_size: 32 # single GPU batch size
+  expdir: './logs/'
+
+  # Data
+  # HDF5 files for PyTorch native dataloader
+  train_path: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_2048crop_train.h5'
+  val_path: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_1024crop_valid.h5'
+  # numpy files for DALI dataloader
+  train_path_npy_data: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_2048crop_train_data.npy'
+  train_path_npy_label: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_2048crop_train_label.npy'
+  val_path_npy_data: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_1024crop_valid_data.npy'
+  val_path_npy_label: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_1024crop_valid_label.npy'
+
+
+# A short config for testing/profiling on a single V100
+short_sm: &short_sm
+  <<: *base_sm
+  Nsamples: 512
+  Nsamples_val: 64
+  num_epochs: 4
+
+# Short config with full optimizations
+short_opt_sm:
+  <<: *short_sm
+  data_loader_config: 'dali-lowmem'
+  num_data_workers: 7
+  enable_amp: True
+  enable_apex: True
+  enable_jit: True
+  amp_mode: fp16  
+
+# Full training, batch size 32, with optimizations
+bs32_opt_sm: &bs32_opt_sm
+  <<: *base_sm
+  data_loader_config: 'dali-lowmem'
+  num_data_workers: 7
+  enable_amp: True
+  enable_apex: True
+  enable_jit: True
+  global_batch_size: 32
+
+bs576_test_sm: # 18 GPUs (3 nodes)
+  <<: *bs32_opt_sm
+  global_batch_size: 576
+
+bs576_opt_sm: # 18 GPUs (3 nodes)
+  <<: *bs32_opt_sm
+  global_batch_size: 576
+  num_epochs: 40
