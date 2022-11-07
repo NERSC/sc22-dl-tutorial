@@ -10,7 +10,7 @@
 #SBATCH -o %x-%j.out
 
 DATADIR=/pscratch/sd/j/joshr/nbody2hydro/datacopies
-LOGDIR=${SCRATCH}/sc21-dl-tutorial/logs
+LOGDIR=${SCRATCH}/sc22-dl-tutorial/logs
 mkdir -p ${LOGDIR}
 args="${@}"
 
