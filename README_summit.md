@@ -205,6 +205,18 @@ For 72 GPUs use 48 epochs
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 12 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs2304_opt_sm"
 
+2022-11-08 05:57:22,846 - root - INFO - Time taken for epoch 1 is 119.31746411323547 sec, avg 540.6752521892049 samples/sec
+2022-11-08 05:57:22,847 - root - INFO -   Avg train loss=0.109694
+2022-11-08 05:57:25,648 - root - INFO -   Avg val loss=0.081074
+2022-11-08 05:57:25,648 - root - INFO -   Total validation time: 2.8007771968841553 sec
+2022-11-08 05:57:36,728 - root - INFO - Time taken for epoch 2 is 11.079113721847534 sec, avg 6030.807308010724 samples/sec
+2022-11-08 05:57:36,728 - root - INFO -   Avg train loss=0.045270
+2022-11-08 05:57:37,957 - root - INFO -   Avg val loss=0.037623
+2022-11-08 05:57:37,959 - root - INFO -   Total validation time: 1.2282912731170654 sec
+2022-11-08 05:57:47,571 - root - INFO - Time taken for epoch 3 is 9.61080002784729 sec, avg 6952.178778707356 samples/sec
+2022-11-08 05:57:47,571 - root - INFO -   Avg train loss=0.026268
+2022-11-08 05:57:48,132 - root - INFO -   Avg val loss=0.033672
+2022-11-08 05:57:48,146 - root - INFO -   Total validation time: 0.5604500770568848 sec
 
 ```
 
@@ -213,7 +225,18 @@ For 288 GPUs use 96 epochs
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 48 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs9216_opt_sm"
 
-
+2022-11-08 06:06:07,478 - root - INFO - Time taken for epoch 1 is 56.57166934013367 sec, avg 1140.3587829824428 samples/sec
+2022-11-08 06:06:07,478 - root - INFO -   Avg train loss=0.138469
+2022-11-08 06:06:07,489 - root - INFO -   Avg val loss=nan
+2022-11-08 06:06:07,489 - root - INFO -   Total validation time: 0.00026726722717285156 sec
+2022-11-08 06:06:44,690 - root - INFO - Time taken for epoch 2 is 37.20052146911621 sec, avg 1981.9077015145829 samples/sec
+2022-11-08 06:06:44,691 - root - INFO -   Avg train loss=0.108786
+2022-11-08 06:06:47,000 - root - INFO -   Avg val loss=0.116034
+2022-11-08 06:06:47,000 - root - INFO -   Total validation time: 2.3085243701934814 sec
+2022-11-08 06:07:00,177 - root - INFO - Time taken for epoch 3 is 13.176549434661865 sec, avg 5595.3950892525145 samples/sec
+2022-11-08 06:07:00,177 - root - INFO -   Avg train loss=0.078056
+2022-11-08 06:07:01,561 - root - INFO -   Avg val loss=0.079437
+2022-11-08 06:08:40,605 - root - INFO -   Total validation time: 1.3832640647888184 sec
 ```
 
 ## Multi-GPU performance profiling and optimization
