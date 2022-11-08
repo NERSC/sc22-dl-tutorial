@@ -113,12 +113,18 @@ base_sm: &base_sm
   val_path_npy_data: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_1024crop_valid_data.npy'
   val_path_npy_label: '/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data/downsamp_1024crop_valid_label.npy'
 
+# A short config for testing/profiling on a single V100
+shorter_sm: &shorter_sm
+  <<: *base_sm
+  Nsamples: 512
+  Nsamples_val: 64
+  num_epochs: 4
 
 # A short config for testing/profiling on a single V100
 short_sm: &short_sm
   <<: *base_sm
-  Nsamples: 512
-  Nsamples_val: 64
+  Nsamples: 4096
+  Nsamples_val: 512
   num_epochs: 4
 
 # Short config with full optimizations
@@ -126,20 +132,20 @@ short_opt_sm:
   <<: *short_sm
   data_loader_config: 'dali-lowmem'
   num_data_workers: 7
-  enable_amp: True
+  amp_mode: fp16    
   enable_apex: True
   enable_jit: True
-  amp_mode: fp16  
 
 # Full training, batch size 32, with optimizations
 bs32_opt_sm: &bs32_opt_sm
   <<: *base_sm
   data_loader_config: 'dali-lowmem'
   num_data_workers: 7
-  enable_amp: True
+  amp_mode: fp16  
   enable_apex: True
   enable_jit: True
   global_batch_size: 32
+  num_epochs: 3
 
 bs576_test_sm: # 18 GPUs (3 nodes)
   <<: *bs32_opt_sm
@@ -148,4 +154,15 @@ bs576_test_sm: # 18 GPUs (3 nodes)
 bs576_opt_sm: # 18 GPUs (3 nodes)
   <<: *bs32_opt_sm
   global_batch_size: 576
-  num_epochs: 40
+  num_epochs: 12
+
+bs2304_opt_sm: # 72 GPUs (12 nodes)
+  <<: *bs32_opt_sm
+  global_batch_size: 2304
+  num_epochs: 48
+
+bs9216_opt_sm: # 288 GPUs (48 nodes)
+  <<: *bs32_opt_sm
+  global_batch_size: 9216
+  num_epochs: 96
+
