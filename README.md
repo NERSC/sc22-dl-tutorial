@@ -161,7 +161,7 @@ If running interactively, this is the full command from the batch submission scr
 ```
 nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=short --num_epochs 2 --enable_manual_profiling
 ```
-This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file `baseline.qdrep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
+This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file `baseline.nsys-rep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
 
 Loading this profile ([`baseline.qdrep`](sample_nsys_profiles/baseline.qdrep)) in Nsight Systems will look like this:
 ![NSYS Baseline](tutorial_images/nsys_baseline.png)
