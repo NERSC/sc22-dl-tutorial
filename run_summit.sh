@@ -4,7 +4,7 @@ ENABLE_PROFILING=${1}
 PROFILE_OUTPUT=${2}
 
 # Profiling
-if [ "${ENABLE_PROFILING:-0}" -eq 1 ]; then
+if [ "${ENABLE_PROFILING:-0}" -eq 1 ] && [ "$PMIX_RANK" -eq 0 ] ; then
     echo "Enabling profiling..."
     NSYS_ARGS="--trace=cuda,nvtx,osrt --kill none -c cudaProfilerApi -f true"
     NSYS_OUTPUT=${PROFILE_OUTPUT:-"profile"}
