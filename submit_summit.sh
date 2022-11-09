@@ -22,12 +22,12 @@ hostname
 
 #~/dummy
 
-export NCCL_NET_GDR_LEVEL=PHB
+#export NCCL_NET_GDR_LEVEL=PHB
 
 BENCHY_CONFIG=benchy-conf.yaml
 BENCHY_OUTPUT=${BENCHY_OUTPUT:-"benchy_output"}
-sed "s/.*output_filename.*/        output_filename: ${BENCHY_OUTPUT}.json/" ${BENCHY_CONFIG} > benchy-run-${SLURM_JOBID}.yaml
-export BENCHY_CONFIG_FILE=benchy-run-${SLURM_JOBID}.yaml
+sed "s/.*output_filename.*/        output_filename: ${BENCHY_OUTPUT}.json/" ${BENCHY_CONFIG} > benchy-run-${LSB_JOBID}.yaml
+export BENCHY_CONFIG_FILE=benchy-run-${LSB_JOBID}.yaml
 export MASTER_ADDR=$(hostname)
 
 set -x
@@ -49,4 +49,4 @@ time jsrun -n${nnodes} -a"$(($2))" -c42 -g"$(($2))" -r1 \
      ./launch_summit.sh \
      "./run_summit.sh ${ENABLE_PROFILING} ${PROFILE_OUTPUT} ${args}"
 
-rm benchy-run-${SLURM_JOBID}.yaml
+rm benchy-run-${LSB_JOBID}.yaml
