@@ -264,7 +264,11 @@ Using the optimized options for compute and I/O, we profile the communication ba
 ```
 ENABLE_PROFILING=1 PROFILE_OUTPUT=6gpu_baseline bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.baseline.o%J -nnodes 1 -alloc_flags "gpumps smt4"  "./submit_summit.sh -g 6 --config=short_opt_sm --num_epochs 8 --local_batch_size 8 --enable_manual_profiling"
 ```
-the example proflie [`6gpu_baseline.qdrep`](sample_nsys_profiles/6gpu_baseline.qdrep) can be viewed via Nsight Systems. 
+the example proflie [`6gpu_baseline.qdrep`](sample_nsys_profiles/6gpu_baseline.qdrep) can be viewed via Nsight Systems, which looks like 
+![NSYS 6gpu_Baseline](tutorial_images/nsys_summit_6gpu_baseline.png)
+
+By default, for our model there are 8 NCCL calls per iteration, as shown in zoomed-in view:
+![NSYS 6gpu_Baseline_zoomed](tutorial_images/nsys_summit_6gpu_baseline_zoomed.png)
 
 The performance of this run:
 ```
@@ -303,7 +307,8 @@ The performance of this run:
 2022-11-09 09:03:47,342 - root - INFO -   Avg val loss=0.016038
 2022-11-09 09:03:47,343 - root - INFO -   Total validation time: 0.4036595821380615 sec
 ```
-The generated profile [`6gpu_nobroadcast.qdrep`](sample_nsys_profiles/6gpu_nobroadcast.qdrep)
+The generated profile [`6gpu_nobroadcast.qdrep`](sample_nsys_profiles/6gpu_nobroadcast.qdrep) and it looks like
+![NSYS 6gpu_nobroadcast](tutorial_images/nsys_summit_6gpu_nobroadcast.png)
 
 To show the effect of the message bucket size, we add another knob to the code, `--bucket_cap_mb`. We profile a run with 100 mb bucket size with following command:
 ```
@@ -324,7 +329,9 @@ The performance of this run:
 2022-11-09 09:03:45,500 - root - INFO -   Avg val loss=0.015974
 2022-11-09 09:03:45,500 - root - INFO -   Total validation time: 0.407240629196167 sec
 ```
-and corresponding profile [`6gpu_bucketcap100mb.qdrep`](sample_nsys_profiles/6gpu_bucketcap100mb.qdrep)
+and corresponding profile [`6gpu_bucketcap100mb.qdrep`](sample_nsys_profiles/6gpu_bucketcap100mb.qdrep), which looks like
+![NSYS 6gpu_bucketcap100mb_zoomed](tutorial_images/nsys_summit_6gpu_bucketcap100mb_zoomed.png)
+The total number of NCCL calls per step now reduced to 5. 
 
 Similarly, to understand the cross node performance, we run the baseline and optimized options with 2 nodes on Summit:
 
