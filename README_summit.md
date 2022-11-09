@@ -259,6 +259,113 @@ BENCHY_OUTPUT=weak_scale_32 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.
 
 ### Profiling with Nsight Systems
 
+Using the optimized options for compute and I/O, we profile the communication baseline with 
+6 GPUs (1 node) on Summit:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=6gpu_baseline bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.baseline.o%J -nnodes 1 -alloc_flags "gpumps smt4"  "./submit_summit.sh -g 6 --config=short_opt_sm --num_epochs 8 --local_batch_size 8 --enable_manual_profiling"
+```
+the example proflie [`6gpu_baseline.qdrep`](sample_nsys_profiles/6gpu_baseline.qdrep) can be viewed via Nsight Systems. 
+
+The performance of this run:
+```
+2022-11-09 09:03:03,764 - root - INFO - Time taken for epoch 2 is 34.94349765777588 sec, avg 118.13356637701686 samples/sec
+2022-11-09 09:03:03,770 - root - INFO -   Avg train loss=0.041073
+2022-11-09 09:03:04,178 - root - INFO -   Avg val loss=0.031329
+2022-11-09 09:03:04,178 - root - INFO -   Total validation time: 0.40726447105407715 sec
+2022-11-09 09:03:13,658 - root - INFO - Time taken for epoch 3 is 9.478790998458862 sec, avg 435.4985778957636 samples/sec
+2022-11-09 09:03:13,658 - root - INFO -   Avg train loss=0.019790
+2022-11-09 09:03:14,071 - root - INFO -   Avg val loss=0.021612
+2022-11-09 09:03:14,072 - root - INFO -   Total validation time: 0.41242146492004395 sec
+2022-11-09 09:03:23,531 - root - INFO - Time taken for epoch 4 is 9.458720207214355 sec, avg 436.42267765267985 samples/sec
+2022-11-09 09:03:23,531 - root - INFO -   Avg train loss=0.013929
+2022-11-09 09:03:23,946 - root - INFO -   Avg val loss=0.016024
+2022-11-09 09:03:23,946 - root - INFO -   Total validation time: 0.41402602195739746 sec
+```
+
 ### Adjusting DistributedDataParallel options
+
+Since there is no batch norm layer in our model, it's safe to disable the `broadcast_buffers` with the added knob `--disable_broadcast_buffers`:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=6gpu_nobroadcast bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.nobroadcast.o%J -nnodes 1 -alloc_flags "gpumps smt4"  "./submit_summit.sh -g 6 --config=short_opt_sm --num_epochs 8 --local_batch_size 8 --enable_manual_profiling --disable_broadcast_buffers"
+```
+The performance of this run:
+```
+2022-11-09 09:03:27,409 - root - INFO - Time taken for epoch 2 is 39.85852289199829 sec, avg 103.56630653838674 samples/sec
+2022-11-09 09:03:27,415 - root - INFO -   Avg train loss=0.039671
+2022-11-09 09:03:27,819 - root - INFO -   Avg val loss=0.030174
+2022-11-09 09:03:27,820 - root - INFO -   Total validation time: 0.40375518798828125 sec
+2022-11-09 09:03:37,169 - root - INFO - Time taken for epoch 3 is 9.348496437072754 sec, avg 441.5683343077338 samples/sec
+2022-11-09 09:03:37,175 - root - INFO -   Avg train loss=0.019775
+2022-11-09 09:03:37,579 - root - INFO -   Avg val loss=0.021372
+2022-11-09 09:03:37,580 - root - INFO -   Total validation time: 0.4038228988647461 sec
+2022-11-09 09:03:46,932 - root - INFO - Time taken for epoch 4 is 9.35121488571167 sec, avg 441.4399680096583 samples/sec
+2022-11-09 09:03:46,938 - root - INFO -   Avg train loss=0.013456
+2022-11-09 09:03:47,342 - root - INFO -   Avg val loss=0.016038
+2022-11-09 09:03:47,343 - root - INFO -   Total validation time: 0.4036595821380615 sec
+```
+The generated profile [`6gpu_nobroadcast.qdrep`](sample_nsys_profiles/6gpu_nobroadcast.qdrep)
+
+To show the effect of the message bucket size, we add another knob to the code, `--bucket_cap_mb`. We profile a run with 100 mb bucket size with following command:
+```
+ENABLE_PROFILING=1 PROFILE_OUTPUT=6gpu_bucketcap100mb bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.100mb.o%J -nnodes 1 -alloc_flags "gpumps smt4"  "./submit_summit.sh -g 6 --config=short_opt_sm --num_epochs 8 --local_batch_size 8 --enable_manual_profiling --disable_broadcast_buffers --bucket_cap_mb 100"
+```
+The performance of this run:
+```
+2022-11-09 09:03:25,663 - root - INFO - Time taken for epoch 2 is 39.40925359725952 sec, avg 104.74697242900984 samples/sec
+2022-11-09 09:03:25,669 - root - INFO -   Avg train loss=0.040747
+2022-11-09 09:03:26,075 - root - INFO -   Avg val loss=0.031916
+2022-11-09 09:03:26,075 - root - INFO -   Total validation time: 0.40433478355407715 sec
+2022-11-09 09:03:35,384 - root - INFO - Time taken for epoch 3 is 9.308758020401001 sec, avg 443.45335768242205 samples/sec
+2022-11-09 09:03:35,391 - root - INFO -   Avg train loss=0.021065
+2022-11-09 09:03:35,799 - root - INFO -   Avg val loss=0.020096
+2022-11-09 09:03:35,800 - root - INFO -   Total validation time: 0.40817737579345703 sec
+2022-11-09 09:03:45,086 - root - INFO - Time taken for epoch 4 is 9.285616397857666 sec, avg 444.5585325872812 samples/sec
+2022-11-09 09:03:45,092 - root - INFO -   Avg train loss=0.013695
+2022-11-09 09:03:45,500 - root - INFO -   Avg val loss=0.015974
+2022-11-09 09:03:45,500 - root - INFO -   Total validation time: 0.407240629196167 sec
+```
+and corresponding profile [`6gpu_bucketcap100mb.qdrep`](sample_nsys_profiles/6gpu_bucketcap100mb.qdrep)
+
+Similarly, to understand the cross node performance, we run the baseline and optimized options with 2 nodes on Summit:
+
+Baseline:
+```
+bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.n2.baseline.o%J -nnodes 2 -alloc_flags "gpumps smt4"  "./submit_summit.sh -g 6 --config=short_opt_sm --num_epochs 8 --local_batch_size 8"
+```
+and the performance of the run: 
+```
+2022-11-09 08:52:51,817 - root - INFO - Time taken for epoch 6 is 4.794616460800171 sec, avg 860.9656337998473 samples/sec
+2022-11-09 08:52:51,821 - root - INFO -   Avg train loss=0.014148
+2022-11-09 08:52:52,177 - root - INFO -   Avg val loss=0.016380
+2022-11-09 08:52:52,178 - root - INFO -   Total validation time: 0.3557288646697998 sec
+2022-11-09 08:52:56,955 - root - INFO - Time taken for epoch 7 is 4.7768919467926025 sec, avg 864.1602209092682 samples/sec
+2022-11-09 08:52:56,960 - root - INFO -   Avg train loss=0.012832
+2022-11-09 08:52:57,206 - root - INFO -   Avg val loss=0.014343
+2022-11-09 08:52:57,206 - root - INFO -   Total validation time: 0.2450239658355713 sec
+2022-11-09 08:53:01,999 - root - INFO - Time taken for epoch 8 is 4.791579484939575 sec, avg 861.5113268964287 samples/sec
+2022-11-09 08:53:01,999 - root - INFO -   Avg train loss=0.011258
+2022-11-09 08:53:02,249 - root - INFO -   Avg val loss=0.013502
+2022-11-09 08:53:02,250 - root - INFO -   Total validation time: 0.24966740608215332 sec
+```
+
+Optimized:
+```
+bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.n2.100mb.o%J -nnodes 2 -alloc_flags "gpumps smt4"  "./submit_summit.sh -g 6 --config=short_opt_sm --num_epochs 8 --local_batch_size 8 --disable_broadcast_buffers --bucket_cap_mb 100"
+```
+and the performance of the run:
+```
+2022-11-09 08:52:45,939 - root - INFO - Time taken for epoch 6 is 4.755844593048096 sec, avg 867.9846280162615 samples/sec
+2022-11-09 08:52:45,944 - root - INFO -   Avg train loss=0.014258
+2022-11-09 08:52:46,298 - root - INFO -   Avg val loss=0.016293
+2022-11-09 08:52:46,298 - root - INFO -   Total validation time: 0.3531801700592041 sec
+2022-11-09 08:52:51,017 - root - INFO - Time taken for epoch 7 is 4.719024419784546 sec, avg 874.7570753593325 samples/sec
+2022-11-09 08:52:51,022 - root - INFO -   Avg train loss=0.012921
+2022-11-09 08:52:51,267 - root - INFO -   Avg val loss=0.015027
+2022-11-09 08:52:51,267 - root - INFO -   Total validation time: 0.24351286888122559 sec
+2022-11-09 08:52:55,998 - root - INFO - Time taken for epoch 8 is 4.730204105377197 sec, avg 872.6896150860331 samples/sec
+2022-11-09 08:52:56,003 - root - INFO -   Avg train loss=0.011467
+2022-11-09 08:52:56,248 - root - INFO -   Avg val loss=0.014088
+2022-11-09 08:52:56,249 - root - INFO -   Total validation time: 0.24413108825683594 sec
+```
 
 ## Putting it all together
