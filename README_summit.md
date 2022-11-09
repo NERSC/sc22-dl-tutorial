@@ -291,7 +291,7 @@ First we want to measure the scaling efficiency. An example command to generate 
 BENCHY_OUTPUT=weak_scale_8 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
 ```
 
-PLOTS SHOULD GO HERE
+<img src="tutorial_images/scale_perfEff_summit.png" width="500">
 
 Next we can further breakdown the performance of the applications, by switching off the communication between workers. An example command to generate the points for 8 nodes and adding the noddp flag is:
 
@@ -299,9 +299,9 @@ Next we can further breakdown the performance of the applications, by switching 
 BENCHY_OUTPUT=weak_scale_8_noddp bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy --noddp"
 ```
 
-PLOTS SHOULD GO HERE
+<img src="tutorial_images/scale_perfComm_summit.png" width="500">
 
-MORE PLOTS WILL GO HERE WITH BS=52
+<img src="tutorial_images/scale_perfEff_bs54_summit.png" width="500">
 
 ### Profiling with Nsight Systems [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#profiling-with-nsight-systems-1)</sup></sub>
 
