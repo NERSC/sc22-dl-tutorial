@@ -52,6 +52,7 @@ short: &short
 short_opt:
   <<: *short
   data_loader_config: 'dali-lowmem'
+  num_data_workers: 8
   amp_mode: fp16
   enable_apex: True
   enable_jit: True

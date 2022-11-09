@@ -1,5 +1,5 @@
 global:
-        report_freq: 10                         # frequency of terminal throughput output
+        report_freq: 5                          # frequency of terminal throughput output
         exit_after_tests: True                  # terminate process after benchy trials are completed
         profiler_mode: 'single'                 # controls what processes start CUDA profiling (options: 'single', 'all', 'none')
         output_filename: 'benchy_output.json'   # output filename for JSON output
@@ -9,17 +9,17 @@ global:
 IO:
         run_benchmark: True              # enable/disable IO benchmarking
         nbatches: 50                     # number of batches to run per trial
-        ntrials: 2                       # number of trials to run
-        nwarmup: 2                       # number of warmup trials to run
+        ntrials: 3                       # number of trials to run
+        nwarmup: 3                       # number of warmup trials to run
 
 synthetic:
         run_benchmark: True              # enable/disable synthetic/cached data benchmarking
         nbatches: 50                     # number of batches to run per trial
-        ntrials: 2                       # number of trials to run
-        nwarmup: 2                       # number of warmup trials to run
+        ntrials: 3                       # number of trials to run
+        nwarmup: 3                       # number of warmup trials to run
 
 full:
         run_benchmark: True              # enable/disable full training benchmarking
         nbatches: 50                     # number of batches to run per trial
-        ntrials: 2                       # number of trials to run
-        nwarmup: 2                       # number of warmup trials to run
+        ntrials: 3                       # number of trials to run
+        nwarmup: 3                       # number of warmup trials to run
