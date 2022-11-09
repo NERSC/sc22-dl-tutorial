@@ -1,6 +1,6 @@
 # SC22 Deep Learning at Scale Tutorial (Summit Commands)
 
-Refear to main `README.md` for details
+Please refear to main [(README.md)](https://github.com/tsaris/sc22-dl-tutorial/blob/main/README.md) for details of the tutorial and how to run on NERSC's Perlmutter machine. This page has the commands on how to run on OLCF's Summit machine.
 
 Data location on Summit: `/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data`
 
@@ -20,7 +20,12 @@ cd sc22-dl-tutorial
 mkdir logs
 ```
 
-## Single GPU training
+### Installing Nsight Systems
+In this tutorial, we will be generating profile files using NVIDIA Nsight Systems on the remote systems. In order to open and view these
+files on your local computer, you will need to install the Nsight Systems program, which you can download [here](https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2021-4-1-73). Select the download option required for your system (e.g. Mac OS host for MacOS, Window Host for Windows, or Linux Host .rpm/.deb/.run for Linux). You may need to sign up and create a login to NVIDIA's developer program if you do not
+already have an account to access the download. Proceed to run and install the program using your selected installation method.
+
+## Single GPU training <sub><sup> [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#single-gpu-training)</sup></sub>
 
 On Summit for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
 ```
@@ -31,9 +36,9 @@ To view the results in TensorBoard:
 * login to `jupyter.olcf.ornl.gov` from your browsher with the olcf credentials
 * from `jupyter.olcf.ornl.gov` open the file `start_tensorboard_summit.ipynb` that you can find after you clone the repo at `$WORLDWORK/trn001/$USER/sc22-dl-tutorial`
 
-## Single GPU performance profiling and optimization
+## Single GPU performance profiling and optimization [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial/blob/main/README.md#single-gpu-performance-profiling-and-optimization)</sup></sub>
 
-This is the performance of the baseline script with `Nsamples: 512` and `Nsamples_val: 64`
+This is the performance of the baseline script with `Nsamples: 512` and `Nsamples_val: 64` with batch size of 32 on 16GB V100 card.
 
 ```
 2022-11-07 15:13:32,641 - root - INFO - Time taken for epoch 1 is 191.95538854599 sec, avg 2.6672864141937414 samples/sec
@@ -50,8 +55,8 @@ This is the performance of the baseline script with `Nsamples: 512` and `Nsample
 2022-11-07 15:19:36,335 - root - INFO -   Total validation time: 1.7319042682647705 sec
 ```
 
-### Profiling with Nsight Systems
-#### Adding NVTX ranges and profiler controls
+### Profiling with Nsight Systems 
+#### Adding NVTX ranges and profiler controls [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#adding-nvtx-ranges-and-profiler-controls)</sup></sub>
 
 To generate a profile using our scripts on Summit, run the following command:
 ```
@@ -59,7 +64,7 @@ ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline bsub -P stf218 -W 0:30 -J sc22.tut -o
 ```
 This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file baseline.qdrep that can be opened in the Nsight System's program.
 
-#### Using the benchy profiling tool
+#### Using the benchy profiling tool [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#using-the-benchy-profiling-tool)</sup></sub>
 
 To run using using benchy on Summit, use the following command:
 ```
@@ -79,66 +84,84 @@ From these throughput values, we can see that the SYNTHETIC (i.e. compute) throu
 In fact on Summit without dataloading optimizations it is very slow, the above job took ~1h, so we recommend to start runs with dataload optimizations already in for the Summit system.
 
 ### Data loading optimizations
-#### Improving the native PyTorch dataloader performance
+#### Improving the native PyTorch dataloader performance [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#improving-the-native-pytorch-dataloader-performance)</sup></sub>
 
 The PyTorch dataloader has several knobs we can adjust to improve performance. One knob we've left to adjust is the num_workers argument, which we can control via the `--num_data_workers` command line arg to our script. The default in our config is two workers, but it will be very slow if we use `Nsamples` larger than 512, so we are setting it up to seven workers. Reminder that each Summit node has 42 physical cores (168 hardware cores) and 6 GPUs. 
 
 We can run this experiment on Summit by running the following command. This will take ~1h so we recommend go to start the runs with the DALI optimization already in from the next section.
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --enable_benchy"
-
+```
+output
+```
 BENCHY::SUMMARY::IO average trial throughput: 4.750 +/- 0.122
 BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 102.148 +/- 0.079
 BENCHY::SUMMARY::FULL average trial throughput: 4.212 +/- 0.065
 ```
 
-#### Using NVIDIA DALI
+#### Using NVIDIA DALI [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#using-nvidia-dali)</sup></sub>
+
+To use NVIDIA DALI use the `-data_loader_config=dali-lowmem` flag.
 
 ```
 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --enable_benchy"
-
+```
+output
+```
 BENCHY::SUMMARY::IO average trial throughput: 582.159 +/- 40.639
 BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 102.855 +/- 0.141
 BENCHY::SUMMARY::FULL average trial throughput: 101.400 +/- 0.020
 ```
 
-### Enabling Mixed Precision Training
+### Enabling Mixed Precision Training [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#enabling-mixed-precision-training)</sup></sub>
+
+To enable mixed precision training use the `--amp_mode fp16` flag. On Summit the bf16 won't work.
 
 ```
 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_benchy"
-
+```
+output
+```
 BENCHY::SUMMARY::IO average trial throughput: 907.329 +/- 69.924
 BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 270.235 +/- 0.014
 BENCHY::SUMMARY::FULL average trial throughput: 260.223 +/- 1.274
 ```
 
-### Just-in-time (JIT) compiliation and APEX fused optimizers
+### Just-in-time (JIT) compiliation and APEX fused optimizers [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#just-in-time-jit-compiliation-and-apex-fused-optimizers)</sup></sub>
+
+To enable APEX use the `--enable_apex` flag.
 
 ```
 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_apex --enable_benchy"
-
+```
+output
+```
 BENCHY::SUMMARY::IO average trial throughput: 602.045 +/- 60.880
 BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 298.335 +/- 0.317
 BENCHY::SUMMARY::FULL average trial throughput: 281.767 +/- 7.210
 ```
 
+To enable JIT use the `--enable_jit` flag.
+
 ```
 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_apex --enable_jit --enable_benchy"
-
+```
+output
+```
 BENCHY::SUMMARY::IO average trial throughput: 1303.459 +/- 0.094
 BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 294.373 +/- 0.021
 BENCHY::SUMMARY::FULL average trial throughput: 285.010 +/- 0.068
 ```
 
-### Using CUDA Graphs (optional)
-
 ### Full training with optimizations
 
-Default for Summit is 3 epochs
+Now you can run the full model training on a single GPU with our optimizations. For convenience, we provide a configuration with the optimizations already enabled for 3 epochs. Submit the full training with:
 
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=bs32_opt_sm"
-
+```
+output
+```
 2022-11-08 04:23:38,659 - root - INFO - Time taken for epoch 1 is 774.4071238040924 sec, avg 84.5859987421436 samples/sec
 2022-11-08 04:23:38,660 - root - INFO -   Avg train loss=0.010418
 2022-11-08 04:24:13,654 - root - INFO -   Avg val loss=0.006322
@@ -153,20 +176,21 @@ bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "
 2022-11-08 04:46:39,230 - root - INFO -   Total validation time: 29.268264055252075 sec
 ```
 
+![baseline_tb_summit](tutorial_images/baseline_tb_summit.png)
 
-## Distributed GPU training
+## Distributed GPU training [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#distributed-gpu-training)</sup></sub>
 
-### Code basics
+### Large batch convergence [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#large-batch-convergence)</sup></sub>
 
-### Large batch convergence
+To enable multi-gpu training, we need to have the `-g 6`, since Summit has six GPUs per node, and the `-nnodes` for the desired number of nodes.
 
-We need to have `-nnodes` larger than 1 and `-g` six. 
-
-Show with tensorbaard that from 1 to 18 GPUs for the same number of epochs is faser
+As a first attempt, let's try increasing the batchsize from 32 to 576, distributing our training across 18 GPUs (thus 3 Summit nodes). To submit a job with this config, do
 
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs576_test_sm"
-
+```
+output
+```
 2022-11-08 05:24:02,375 - root - INFO - Time taken for epoch 1 is 232.76213240623474 sec, avg 279.6331144036922 samples/sec
 2022-11-08 05:24:02,375 - root - INFO -   Avg train loss=0.060278
 2022-11-08 05:24:17,270 - root - INFO -   Avg val loss=0.023173
@@ -181,11 +205,16 @@ bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "
 2022-11-08 05:25:35,253 - root - INFO -   Total validation time: 1.876542568206787 sec
 ```
 
-For 18 GPUs use 12 epochs
+Looking at the TensorBoard log, we can see that the rate of convergence is increased initially, but the validation loss plateaus quickly and our final accuracy ends up worse than the single-GPU training:
+![bs576_short_summit](tutorial_images/bs576_short_summit.png)
+
+If we increase the total number of epochs, we will run longer (thus giving the model more training iterations to update weights) and the learning rate will decay more slowly, giving us more time to converge quickly with a larger learning rate. To try this out, run the `bs576_opt_sm` config, which runs for 12 epochs rather than 3 on 18 GPUs as well:
 
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs576_opt_sm"
-
+```
+output
+```
 2022-11-08 05:38:52,219 - root - INFO - Time taken for epoch 1 is 207.89257979393005 sec, avg 313.0847674530633 samples/sec
 2022-11-08 05:38:52,220 - root - INFO -   Avg train loss=0.059437
 2022-11-08 05:39:06,496 - root - INFO -   Avg val loss=0.024136
@@ -200,11 +229,16 @@ bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "
 2022-11-08 05:40:25,083 - root - INFO -   Total validation time: 1.8922131061553955 sec
 ```
 
-For 72 GPUs use 48 epochs
+With the longer training, we can see that our higher batch size results are slightly better than the baseline configuration. Furthermore, the minimum in the loss is reached sooner, despite running for more epochs:
+![bs576_summit](tutorial_images/bs576_summit.png)
+
+For 72 GPUs with 48 epochs and batch size of 2304
 
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 12 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs2304_opt_sm"
-
+```
+output
+```
 2022-11-08 05:57:22,846 - root - INFO - Time taken for epoch 1 is 119.31746411323547 sec, avg 540.6752521892049 samples/sec
 2022-11-08 05:57:22,847 - root - INFO -   Avg train loss=0.109694
 2022-11-08 05:57:25,648 - root - INFO -   Avg val loss=0.081074
@@ -220,11 +254,13 @@ bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 12 -alloc_flags 
 
 ```
 
-For 288 GPUs use 96 epochs
+For 288 GPUs with 96 epochs and batch size of 9216.
 
 ```
 bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 48 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs9216_opt_sm"
-
+```
+output
+```
 2022-11-08 06:06:07,478 - root - INFO - Time taken for epoch 1 is 56.57166934013367 sec, avg 1140.3587829824428 samples/sec
 2022-11-08 06:06:07,478 - root - INFO -   Avg train loss=0.138469
 2022-11-08 06:06:07,489 - root - INFO -   Avg val loss=nan
@@ -239,25 +275,35 @@ bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 48 -alloc_flags 
 2022-11-08 06:08:40,605 - root - INFO -   Total validation time: 1.3832640647888184 sec
 ```
 
+And a summary plot of the above runs:
+bs_compare_summit.png
+![bs_compare_summit](tutorial_images/bs_compare_summit.png)
+
 ## Multi-GPU performance profiling and optimization
 
+You can find example json logs from benchy that run on 1 to 32 Summit nodes and made the plots bellow on the `summit_scaling_logs` directory. An example script to make the scaling plots bellow is here: `summit_scaling_logs/plot_weak_scale.py`. To run this on Summit setup a python env with `module load python/3.8-anaconda3`.
+
+### Weak and Strong Throughput Scaling [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#weak-and-strong-throughput-scaling)</sup></sub>
+
+First we want to measure the scaling efficiency. An example command to generate the points for 8 nodes is:
+
 ```
-BENCHY_OUTPUT=weak_scale_1 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
-
-BENCHY_OUTPUT=weak_scale_2 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 2 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
-
-BENCHY_OUTPUT=weak_scale_4 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 4 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
-
 BENCHY_OUTPUT=weak_scale_8 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
-
-BENCHY_OUTPUT=weak_scale_16 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 16 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
-
-BENCHY_OUTPUT=weak_scale_32 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 32 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
 ```
 
-### Weak and Strong Throughput Scaling
+PLOTS SHOULD GO HERE
 
-### Profiling with Nsight Systems
+Next we can further breakdown the performance of the applications, by switching off the communication between workers. An example command to generate the points for 8 nodes and adding the noddp flag is:
+
+```
+BENCHY_OUTPUT=weak_scale_8_noddp bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy --noddp"
+```
+
+PLOTS SHOULD GO HERE
+
+MORE PLOTS WILL GO HERE WITH BS=52
+
+### Profiling with Nsight Systems [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#profiling-with-nsight-systems-1)</sup></sub>
 
 Using the optimized options for compute and I/O, we profile the communication baseline with 
 6 GPUs (1 node) on Summit:
@@ -286,7 +332,7 @@ The performance of this run:
 2022-11-09 09:03:23,946 - root - INFO -   Total validation time: 0.41402602195739746 sec
 ```
 
-### Adjusting DistributedDataParallel options
+### Adjusting DistributedDataParallel options [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial#adjusting-distributeddataparallel-options)</sup></sub>
 
 Since there is no batch norm layer in our model, it's safe to disable the `broadcast_buffers` with the added knob `--disable_broadcast_buffers`:
 ```
@@ -374,5 +420,3 @@ and the performance of the run:
 2022-11-09 08:52:56,248 - root - INFO -   Avg val loss=0.014088
 2022-11-09 08:52:56,249 - root - INFO -   Total validation time: 0.24413108825683594 sec
 ```
-
-## Putting it all together
