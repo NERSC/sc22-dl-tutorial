@@ -95,7 +95,7 @@ First, let us look at the performance of the training script without optimizatio
 
 On Perlmutter for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
 ```
-sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 4
 ```
 `submit_pm.sh` is a batch submission script that defines resources to be requested by SLURM as well as the command to run.
 Note that any arguments for `train.py`, such as the desired config (`--config`), can be added after `submit_pm.sh` when submitting, and they will be passed to `train.py` properly.
@@ -104,7 +104,7 @@ directory. You can find the job id of your job using the command `squeue --me` a
 
 For interactive jobs, you can run the Python script directly using the following command (**NOTE: please don't run training on the Perlmutter login nodes**):
 ```
-python train.py --config=short --num_epochs 3
+python train.py --config=short --num_epochs 4
 ```
 For V100 systems, you will likely need to update the config to reduce the local batch size to 32 due to the reduced memory capacity. Otherwise, instructions are the same.
 
@@ -129,20 +129,24 @@ As our training with the `short` config runs, it should also dump the training m
 
 ## Single GPU performance profiling and optimization
 
-This is the performance of the baseline script for the first three epochs on a 40GB A100 card with batch size 64:
+This is the performance of the baseline script for the first four epochs on a 40GB A100 card with batch size 64:
 ```
-2021-11-09 00:19:04,091 - root - INFO - Time taken for epoch 1 is 110.217036485672 sec, avg 37.1630387697139 samples/sec
-2021-11-09 00:19:04,092 - root - INFO -   Avg train loss=0.065003
-2021-11-09 00:19:14,226 - root - INFO -   Avg val loss=0.040343
-2021-11-09 00:19:14,227 - root - INFO -   Total validation time: 10.133511781692505 sec
-2021-11-09 00:20:03,014 - root - INFO - Time taken for epoch 2 is 48.785075426101685 sec, avg 83.96010386833387 samples/sec
-2021-11-09 00:20:03,049 - root - INFO -   Avg train loss=0.027986
-2021-11-09 00:20:07,986 - root - INFO -   Avg val loss=0.025327
-2021-11-09 00:20:07,987 - root - INFO -   Total validation time: 4.936376571655273 sec
-2021-11-09 00:20:55,329 - root - INFO - Time taken for epoch 3 is 47.339499711990356 sec, avg 86.52393930902795 samples/sec
-2021-11-09 00:20:55,329 - root - INFO -   Avg train loss=0.020926
-2021-11-09 00:21:00,246 - root - INFO -   Avg val loss=0.024092
-2021-11-09 00:21:00,269 - root - INFO -   Total validation time: 4.917020082473755 sec
+2022-11-09 15:33:33,897 - root - INFO - Time taken for epoch 1 is 73.79664635658264 sec, avg 55.503877238652294 samples/sec
+2022-11-09 15:33:33,901 - root - INFO -   Avg train loss=0.066406
+2022-11-09 15:33:39,679 - root - INFO -   Avg val loss=0.042361
+2022-11-09 15:33:39,681 - root - INFO -   Total validation time: 5.777978897094727 sec
+2022-11-09 15:34:28,412 - root - INFO - Time taken for epoch 2 is 48.72997832298279 sec, avg 84.05503431279347 samples/sec
+2022-11-09 15:34:28,414 - root - INFO -   Avg train loss=0.028927
+2022-11-09 15:34:33,504 - root - INFO -   Avg val loss=0.026633
+2022-11-09 15:34:33,504 - root - INFO -   Total validation time: 5.089476585388184 sec
+2022-11-09 15:35:22,528 - root - INFO - Time taken for epoch 3 is 49.02241778373718 sec, avg 83.55361047408023 samples/sec
+2022-11-09 15:35:22,531 - root - INFO -   Avg train loss=0.019387
+2022-11-09 15:35:27,788 - root - INFO -   Avg val loss=0.021904
+2022-11-09 15:35:27,788 - root - INFO -   Total validation time: 5.256815195083618 sec
+2022-11-09 15:36:15,871 - root - INFO - Time taken for epoch 4 is 48.08129024505615 sec, avg 85.18906167292717 samples/sec
+2022-11-09 15:36:15,872 - root - INFO -   Avg train loss=0.017213
+2022-11-09 15:36:20,641 - root - INFO -   Avg val loss=0.020661
+2022-11-09 15:36:20,642 - root - INFO -   Total validation time: 4.768946886062622 sec
 ```
 After the first epoch, we see that the throughput achieved is about 85 samples/s.
 
@@ -155,15 +159,15 @@ We can also add calls to `torch.cuda.profiler.start()` and `torch.cuda.profiler.
 
 To generate a profile using our scripts on Perlmutter, run the following command: 
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --config=short --num_epochs 2 --enable_manual_profiling
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline sbatch -n1 submit_pm.sh --config=short --num_epochs 4 --enable_manual_profiling
 ```
 If running interactively, this is the full command from the batch submission script:
 ```
-nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=short --num_epochs 2 --enable_manual_profiling
+nsys profile -o baseline --trace=cuda,nvtx -c cudaProfilerApi --kill none -f true python train.py --config=short --num_epochs 4 --enable_manual_profiling
 ```
-This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file `baseline.nsys-rep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
+This command will run four epochs of the training script, profiling only 60 steps of the last epoch. It will produce a file `baseline.nsys-rep` that can be opened in the Nsight System's program. The arg `--trace=cuda,nvtx` is optional and is used here to disable OS Runtime tracing for speed.
 
-Loading this profile ([`baseline.qdrep`](sample_nsys_profiles/baseline.qdrep)) in Nsight Systems will look like this:
+Loading this profile ([`baseline.nsys-rep`](sample_nsys_profiles/baseline.nsys-rep)) in Nsight Systems will look like this:
 ![NSYS Baseline](tutorial_images/nsys_baseline.png)
 
 From this zoomed out view, we can see a lot idle gaps between iterations. These gaps are due to the data loading, which we will address in the next section.
@@ -177,19 +181,19 @@ As an alternative to manually specifying NVTX ranges, we've included the use of 
 
 To run using using benchy on Perlmutter, use the following command: 
 ```
-sbatch -n1 submit_pm.sh --config=short --num_epochs 10 --enable_benchy
+sbatch -n1 submit_pm.sh --config=short --num_epochs 15 --enable_benchy
 ```
 If running interactively:
 ```
-python train.py --config=short ---num_epochs 10 -enable_benchy
+python train.py --config=short ---num_epochs 15 -enable_benchy
 ```
-benchy uses epoch boundaries to separate the test trials it runs, so in these cases we increase the epoch limit to 10 to ensure the full experiment runs.
+benchy uses epoch boundaries to separate the test trials it runs, so in these cases we increase the epoch limit to 15 to ensure the full experiment runs.
 
 benchy will report throughput measurements directly to the terminal, including a simple summary of averages at the end of the job. For this case on Perlmutter, the summary output from benchy is:
 ```
-BENCHY::SUMMARY::IO average trial throughput: 89.177 +/- 1.011
-BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 376.537 +/- 0.604
-BENCHY::SUMMARY::FULL average trial throughput: 89.971 +/- 0.621
+BENCHY::SUMMARY::IO average trial throughput: 84.468 +/- 0.463
+BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 481.618 +/- 1.490
+BENCHY::SUMMARY::FULL average trial throughput: 83.212 +/- 0.433
 ```
 From these throughput values, we can see that the `SYNTHETIC` (i.e. compute) throughput is greater than the `IO` (i.e. data loading) throughput.
 The `FULL` (i.e. real) throughput is bounded by the slower of these two values, which is `IO` in this case. What these throughput
@@ -208,81 +212,93 @@ of workers improves performance.
 
 We can run this experiment on Perlmutter by running the following command:
 ```
-sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers <value of your choice>
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 4 --num_data_workers <value of your choice>
 ```
 If running interactively:
 ```
-python train.py --config=short --num_epochs 3 --num_data_workers <value of your choice>
+python train.py --config=short --num_epochs 4 --num_data_workers <value of your choice>
 ```
 
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and 4 data workers:
+This is the performance of the training script for the first four epochs on a 40GB A100 card with batch size 64 and 4 data workers:
 ```
-2021-11-09 00:21:17,371 - root - INFO - Time taken for epoch 1 is 79.13155698776245 sec, avg 51.761903290155644 samples/sec
-2021-11-09 00:21:17,372 - root - INFO -   Avg train loss=0.065546
-2021-11-09 00:21:23,152 - root - INFO -   Avg val loss=0.044859
-2021-11-09 00:21:23,185 - root - INFO -   Total validation time: 5.7792582511901855 sec
-2021-11-09 00:21:48,916 - root - INFO - Time taken for epoch 2 is 25.728514432907104 sec, avg 159.20079686999583 samples/sec
-2021-11-09 00:21:48,941 - root - INFO -   Avg train loss=0.028024
-2021-11-09 00:21:52,277 - root - INFO -   Avg val loss=0.025949
-2021-11-09 00:21:52,277 - root - INFO -   Total validation time: 3.3348052501678467 sec
-2021-11-09 00:22:17,380 - root - INFO - Time taken for epoch 3 is 25.10083317756653 sec, avg 163.18183428511588 samples/sec
-2021-11-09 00:22:17,387 - root - INFO -   Avg train loss=0.021308
-2021-11-09 00:22:20,662 - root - INFO -   Avg val loss=0.024352
-2021-11-09 00:22:20,662 - root - INFO -   Total validation time: 3.2743005752563477 sec
-```
-
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and 8 data workers:
-```
-2021-11-09 00:32:48,064 - root - INFO - Time taken for epoch 1 is 62.2959144115448 sec, avg 65.75070032587757 samples/sec
-2021-11-09 00:32:48,064 - root - INFO -   Avg train loss=0.073569
-2021-11-09 00:32:52,265 - root - INFO -   Avg val loss=0.048459
-2021-11-09 00:32:52,265 - root - INFO -   Total validation time: 4.200311183929443 sec
-2021-11-09 00:33:07,551 - root - INFO - Time taken for epoch 2 is 15.283130884170532 sec, avg 268.00791219045453 samples/sec
-2021-11-09 00:33:07,551 - root - INFO -   Avg train loss=0.032871
-2021-11-09 00:33:10,462 - root - INFO -   Avg val loss=0.030250
-2021-11-09 00:33:10,462 - root - INFO -   Total validation time: 2.910416841506958 sec
-2021-11-09 00:33:25,404 - root - INFO - Time taken for epoch 3 is 14.93994927406311 sec, avg 274.16425081917566 samples/sec
-2021-11-09 00:33:25,405 - root - INFO -   Avg train loss=0.024557
-2021-11-09 00:33:28,357 - root - INFO -   Avg val loss=0.027871
-2021-11-09 00:33:28,357 - root - INFO -   Total validation time: 2.9516751766204834 sec
+2022-11-09 15:39:11,669 - root - INFO - Time taken for epoch 1 is 45.737974405288696 sec, avg 89.55359421265447 samples/sec
+2022-11-09 15:39:11,670 - root - INFO -   Avg train loss=0.073490
+2022-11-09 15:39:15,088 - root - INFO -   Avg val loss=0.045034
+2022-11-09 15:39:15,088 - root - INFO -   Total validation time: 3.416804075241089 sec
+2022-11-09 15:39:44,070 - root - INFO - Time taken for epoch 2 is 28.980637788772583 sec, avg 141.33574388024115 samples/sec
+2022-11-09 15:39:44,073 - root - INFO -   Avg train loss=0.030368
+2022-11-09 15:39:47,385 - root - INFO -   Avg val loss=0.026028
+2022-11-09 15:39:47,385 - root - INFO -   Total validation time: 3.31168794631958 sec
+2022-11-09 15:40:15,724 - root - INFO - Time taken for epoch 3 is 28.337406396865845 sec, avg 144.5439269436113 samples/sec
+2022-11-09 15:40:15,727 - root - INFO -   Avg train loss=0.019323
+2022-11-09 15:40:19,103 - root - INFO -   Avg val loss=0.020982
+2022-11-09 15:40:19,103 - root - INFO -   Total validation time: 3.376103639602661 sec
+2022-11-09 15:40:47,585 - root - INFO - Time taken for epoch 4 is 28.479787349700928 sec, avg 143.8212985829409 samples/sec
+2022-11-09 15:40:47,586 - root - INFO -   Avg train loss=0.017431
+2022-11-09 15:40:50,858 - root - INFO -   Avg val loss=0.020178
+2022-11-09 15:40:50,859 - root - INFO -   Total validation time: 3.2716639041900635 sec
 ```
 
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and 16 data workers:
+This is the performance of the training script for the first four epochs on a 40GB A100 card with batch size 64 and 8 data workers:
 ```
-2021-11-09 00:21:01,556 - root - INFO - Time taken for epoch 1 is 62.40265655517578 sec, avg 65.63823122463319 samples/sec
-2021-11-09 00:21:01,565 - root - INFO -   Avg train loss=0.069824
-2021-11-09 00:21:06,210 - root - INFO -   Avg val loss=0.043009
-2021-11-09 00:21:06,225 - root - INFO -   Total validation time: 4.645080804824829 sec
-2021-11-09 00:21:22,464 - root - INFO - Time taken for epoch 2 is 16.23646593093872 sec, avg 252.27164688560939 samples/sec
-2021-11-09 00:21:22,479 - root - INFO -   Avg train loss=0.029511
-2021-11-09 00:21:25,424 - root - INFO -   Avg val loss=0.028309
-2021-11-09 00:21:25,444 - root - INFO -   Total validation time: 2.943828582763672 sec
-2021-11-09 00:21:41,607 - root - INFO - Time taken for epoch 3 is 16.159828186035156 sec, avg 253.46804142012112 samples/sec
-2021-11-09 00:21:41,608 - root - INFO -   Avg train loss=0.022431
-2021-11-09 00:21:44,875 - root - INFO -   Avg val loss=0.026001
-2021-11-09 00:21:44,897 - root - INFO -   Total validation time: 3.266282796859741 sec
+2022-11-09 15:43:17,251 - root - INFO - Time taken for epoch 1 is 33.487831115722656 sec, avg 122.31308697913593 samples/sec
+2022-11-09 15:43:17,252 - root - INFO -   Avg train loss=0.073041
+2022-11-09 15:43:20,238 - root - INFO -   Avg val loss=0.046040
+2022-11-09 15:43:20,239 - root - INFO -   Total validation time: 2.9856343269348145 sec
+2022-11-09 15:43:41,047 - root - INFO - Time taken for epoch 2 is 20.80655312538147 sec, avg 196.861055039596 samples/sec
+2022-11-09 15:43:41,047 - root - INFO -   Avg train loss=0.029219
+2022-11-09 15:43:43,839 - root - INFO -   Avg val loss=0.025189
+2022-11-09 15:43:43,839 - root - INFO -   Total validation time: 2.791450262069702 sec
+2022-11-09 15:44:04,333 - root - INFO - Time taken for epoch 3 is 20.492927312850952 sec, avg 199.8738363470128 samples/sec
+2022-11-09 15:44:04,336 - root - INFO -   Avg train loss=0.019040
+2022-11-09 15:44:07,148 - root - INFO -   Avg val loss=0.021613
+2022-11-09 15:44:07,148 - root - INFO -   Total validation time: 2.8117287158966064 sec
+2022-11-09 15:44:27,724 - root - INFO - Time taken for epoch 4 is 20.574484825134277 sec, avg 199.0815339879728 samples/sec
+2022-11-09 15:44:27,724 - root - INFO -   Avg train loss=0.017410
+2022-11-09 15:44:30,501 - root - INFO -   Avg val loss=0.020545
+2022-11-09 15:44:30,501 - root - INFO -   Total validation time: 2.776258707046509 sec
 ```
 
-Increasing the number of workers to 8 improves performance to around 270 samples per second, while increasing to 16 workers causes a slight reduction from this.
+This is the performance of the training script for the first four epochs on a 40GB A100 card with batch size 64 and 16 data workers:
+```
+2022-11-09 15:47:46,373 - root - INFO - Time taken for epoch 1 is 31.55659580230713 sec, avg 129.79853801912748 samples/sec
+2022-11-09 15:47:46,373 - root - INFO -   Avg train loss=0.066807
+2022-11-09 15:47:49,513 - root - INFO -   Avg val loss=0.044213
+2022-11-09 15:47:49,513 - root - INFO -   Total validation time: 3.139697790145874 sec
+2022-11-09 15:48:09,174 - root - INFO - Time taken for epoch 2 is 19.658984661102295 sec, avg 208.3525711327522 samples/sec
+2022-11-09 15:48:09,174 - root - INFO -   Avg train loss=0.027332
+2022-11-09 15:48:12,697 - root - INFO -   Avg val loss=0.024337
+2022-11-09 15:48:12,697 - root - INFO -   Total validation time: 3.5227739810943604 sec
+2022-11-09 15:48:32,134 - root - INFO - Time taken for epoch 3 is 19.434626817703247 sec, avg 210.75784157938665 samples/sec
+2022-11-09 15:48:32,136 - root - INFO -   Avg train loss=0.018133
+2022-11-09 15:48:35,182 - root - INFO -   Avg val loss=0.020886
+2022-11-09 15:48:35,182 - root - INFO -   Total validation time: 3.0449066162109375 sec
+2022-11-09 15:48:54,834 - root - INFO - Time taken for epoch 4 is 19.65017533302307 sec, avg 208.44597722832904 samples/sec
+2022-11-09 15:48:54,834 - root - INFO -   Avg train loss=0.016385
+2022-11-09 15:48:57,621 - root - INFO -   Avg val loss=0.020395
+2022-11-09 15:48:57,621 - root - INFO -   Total validation time: 2.786870241165161 sec
+```
 
-We can run the 8 worker configuration through profiler using the instructions in the previous section with the added `--num_data_workers`
-argument and load that profile in Nsight Systems. This is what this profile ([`8workers.qdrep`](sample_nsys_profiles/8workers.qdrep)) looks like:
-![NSYS Native Data](tutorial_images/nsys_nativedata_8workers.png)
+Increasing the number of workers to 8 improves performance to around 200 samples per second, while increasing to 16 workers yields only a slight improvement from this.
+
+We can run the 16 worker configuration through profiler using the instructions in the previous section with the added `--num_data_workers`
+argument and load that profile in Nsight Systems. This is what this profile ([`16workers.nsys-rep`](sample_nsys_profiles/16workers.nsys-rep)) looks like:
+![NSYS Native Data](tutorial_images/nsys_nativedata_16workers.png)
 
 and zoomed in:
-![NSYS Native Data Zoomed](tutorial_images/nsys_nativedata_8workers_zoomed.png)
+![NSYS Native Data Zoomed](tutorial_images/nsys_nativedata_16workers_zoomed.png)
 
-With 8 data workers, the large gaps between steps are mostly alleviated, improving the throughput. Looking at the zoomed in profile, we
+With 16 data workers, the large gaps between steps somewhat alleviated, improving the throughput. However, from the zoomed out view, we still see large gaps between groups of 16 iterations. Looking at the zoomed in profile, we
 still see that the H2D copy in of the input data takes some time and could be improved. One option here is to implement a prefetching
 mechanism in PyTorch directly using CUDA streams to concurrently load and copy in the next batch of input during the current batch, however
 this is left as an exercise outside of this tutorial. A good example of this can be found in [here](https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Classification/ConvNets/image_classification/dataloaders.py#L347).
 
-Using benchy, we can also check how the various throughputs compare using 8 data workers. Running this configuration on Perlmutter
+Using benchy, we can also check how the various throughputs compare using 16 data workers. Running this configuration on Perlmutter
 using the tool yields the following:
 ```
-BENCHY::SUMMARY::IO average trial throughput: 303.304 +/- 1.468
-BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 359.426 +/- 3.380
-BENCHY::SUMMARY::FULL average trial throughput: 252.044 +/- 0.253
+BENCHY::SUMMARY::IO average trial throughput: 234.450 +/- 47.531
+BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 415.428 +/- 18.697
+BENCHY::SUMMARY::FULL average trial throughput: 166.868 +/- 2.432
 ```
 `IO` is faster as expected, and the `FULL` throughput increases correspondingly. However, `IO` is still lower than `SYNTHETIC`, meaning we
 should still address data loading before focusing on compute improvements.
@@ -300,46 +316,50 @@ The NVIDIA DALI library is a data loading library that can address both of these
 For this tutorial, we've provided an alternative data loader using DALI to accelerate the data augementations used in this training script (e.g. 3D cropping, rotations, and flips) that can be found in `utils/data_loader_dali.py`. This data loader is enabled via the command line
 argument `--data_loader_config=dali-lowmem` to the training script.
 
-We can run this experiment on Perlmutter using DALI with 4 worker threads by running the following command:
+We can run this experiment on Perlmutter using DALI with 8 worker threads by running the following command:
 ```
-sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem
 ```
 If running interactively:
 ```
-python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+python train.py --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem
 ```
 
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64 and DALI:
+This is the performance of the training script for the first four epochs on a 40GB A100 card with batch size 64 and DALI:
 ```
-2021-11-09 19:45:15,642 - root - INFO - Time taken for epoch 1 is 252.39585137367249 sec, avg 16.22847593455831 samples/sec
-2021-11-09 19:45:15,643 - root - INFO -   Avg train loss=0.067969
-2021-11-09 19:45:20,926 - root - INFO -   Avg val loss=0.045880
-2021-11-09 19:45:20,927 - root - INFO -   Total validation time: 5.283399343490601 sec
-2021-11-09 19:45:31,323 - root - INFO - Time taken for epoch 2 is 10.39395022392273 sec, avg 394.0753911417279 samples/sec
-2021-11-09 19:45:31,323 - root - INFO -   Avg train loss=0.029736
-2021-11-09 19:45:32,451 - root - INFO -   Avg val loss=0.027525
-2021-11-09 19:45:32,451 - root - INFO -   Total validation time: 1.127028226852417 sec
-2021-11-09 19:45:42,819 - root - INFO - Time taken for epoch 3 is 10.365204572677612 sec, avg 395.1682739380698 samples/sec
-2021-11-09 19:45:42,819 - root - INFO -   Avg train loss=0.021830
-2021-11-09 19:45:43,599 - root - INFO -   Avg val loss=0.024980
-2021-11-09 19:45:43,599 - root - INFO -   Total validation time: 0.7794735431671143 sec
+2022-11-09 16:06:54,501 - root - INFO - Time taken for epoch 1 is 218.65716981887817 sec, avg 18.439825244879255 samples/sec
+2022-11-09 16:06:54,502 - root - INFO -   Avg train loss=0.067234
+2022-11-09 16:07:02,075 - root - INFO -   Avg val loss=0.045643
+2022-11-09 16:07:02,079 - root - INFO -   Total validation time: 7.572189092636108 sec
+2022-11-09 16:07:14,529 - root - INFO - Time taken for epoch 2 is 12.448298931121826 sec, avg 329.0409414702956 samples/sec
+2022-11-09 16:07:14,529 - root - INFO -   Avg train loss=0.029191
+2022-11-09 16:07:15,911 - root - INFO -   Avg val loss=0.026629
+2022-11-09 16:07:15,911 - root - INFO -   Total validation time: 1.3810546398162842 sec
+2022-11-09 16:07:23,015 - root - INFO - Time taken for epoch 3 is 7.101759910583496 sec, avg 576.7584446069318 samples/sec
+2022-11-09 16:07:23,018 - root - INFO -   Avg train loss=0.019404
+2022-11-09 16:07:24,046 - root - INFO -   Avg val loss=0.021680
+2022-11-09 16:07:24,046 - root - INFO -   Total validation time: 1.0282492637634277 sec
+2022-11-09 16:07:31,144 - root - INFO - Time taken for epoch 4 is 7.096238374710083 sec, avg 577.2072165159393 samples/sec
+2022-11-09 16:07:31,145 - root - INFO -   Avg train loss=0.017324
+2022-11-09 16:07:31,782 - root - INFO -   Avg val loss=0.020755
+2022-11-09 16:07:31,783 - root - INFO -   Total validation time: 0.6371126174926758 sec
 ```
 
 We can run the DALI case through profiler using the instructions in the earlier section with the added `--data_loader_config=dali-lowmem`
-argument and load that profile in Nsight Systems. This is what this profile ([`dali.qdrep`](sample_nsys_profiles/dali.qdrep)) looks like:
+argument and load that profile in Nsight Systems. This is what this profile ([`dali.nsys-rep`](sample_nsys_profiles/dali.nsys-rep)) looks like:
 ![NSYS DALI](tutorial_images/nsys_dali.png)
 
 and zoomed in to a single iteration:
 ![NSYS DALI Zoomed](tutorial_images/nsys_dali_zoomed.png)
 
 With DALI, you will see that there are now multiple CUDA stream rows in the timeline view, corresponding to internal streams DALI uses
-to run data augmentation kernels and any memory movement concurrently with the existing PyTorch compute kernels. Stream 13 in this view, in particular, shows concurrent H2D memory copies of the batch input data, which is an improvement over the native dataloader.
+to run data augmentation kernels and any memory movement concurrently with the existing PyTorch compute kernels. Stream 16 in this view, in particular, shows concurrent H2D memory copies of the batch input data, which is an improvement over the native dataloader.
 
 Running this case using benchy on Perlmutter results in the following throughput measurements:
 ```
-BENCHY::SUMMARY::IO average trial throughput: 779.272 +/- 1.352
-BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 421.592 +/- 0.008
-BENCHY::SUMMARY::FULL average trial throughput: 396.084 +/- 0.058
+BENCHY::SUMMARY::IO average trial throughput: 943.632 +/- 83.507
+BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 592.984 +/- 0.052
+BENCHY::SUMMARY::FULL average trial throughput: 578.118 +/- 0.046
 ```
 One thing we can notice here is that the `SYNTHETIC` speed is increased from previous cases. This is because the synthetic data sample that
 is cached and reused from the DALI data loader is already resident on the GPU, in contrast to the case using the PyTorch dataloader where
@@ -357,22 +377,26 @@ The `torch.cuda.amp.autocast` context manager handles converting model operation
 As a quick note, the A100 GPUs we've been using to report results thus far have been able to benefit from Tensor Core compute via the use of TF32 precision operations, enabled by default for CUDNN and CUBLAS in PyTorch. We can measure the benefit of TF32 precision usage on the A100 GPU by temporarily disabling it via setting the environment variable `NVIDIA_TF32_OVERRIDE=0`.  
 We can run this experiment on Perlmutter by running the following command:
 ```
-NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem
+NVIDIA_TF32_OVERRIDE=0 sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem
 ```
-yields the following result for 3 epochs:
+yields the following result for 4 epochs:
 ```
-2021-11-09 20:22:23,191 - root - INFO - Time taken for epoch 1 is 265.8437602519989 sec, avg 15.407546132048822 samples/sec
-2021-11-09 20:22:23,215 - root - INFO -   Avg train loss=0.072700
-2021-11-09 20:22:29,499 - root - INFO -   Avg val loss=0.046892
-2021-11-09 20:22:29,529 - root - INFO -   Total validation time: 6.283871173858643 sec
-2021-11-09 20:23:00,372 - root - INFO - Time taken for epoch 2 is 30.84027910232544 sec, avg 132.81332462685626 samples/sec
-2021-11-09 20:23:00,379 - root - INFO -   Avg train loss=0.031500
-2021-11-09 20:23:02,227 - root - INFO -   Avg val loss=0.029362
-2021-11-09 20:23:02,228 - root - INFO -   Total validation time: 1.8474531173706055 sec
-2021-11-09 20:23:33,090 - root - INFO - Time taken for epoch 3 is 30.859854459762573 sec, avg 132.7290770389302 samples/sec
-2021-11-09 20:23:33,091 - root - INFO -   Avg train loss=0.023513
-2021-11-09 20:23:34,895 - root - INFO -   Avg val loss=0.027441
-2021-11-09 20:23:34,917 - root - INFO -   Total validation time: 1.8037540912628174 sec
+2022-11-09 16:14:15,095 - root - INFO - Time taken for epoch 1 is 239.92680501937866 sec, avg 16.80512521172588 samples/sec
+2022-11-09 16:14:15,097 - root - INFO -   Avg train loss=0.067225
+2022-11-09 16:14:22,583 - root - INFO -   Avg val loss=0.041215
+2022-11-09 16:14:22,585 - root - INFO -   Total validation time: 7.484572410583496 sec
+2022-11-09 16:14:50,312 - root - INFO - Time taken for epoch 2 is 27.725804328918457 sec, avg 147.73241387005703 samples/sec
+2022-11-09 16:14:50,317 - root - INFO -   Avg train loss=0.027006
+2022-11-09 16:14:51,934 - root - INFO -   Avg val loss=0.024100
+2022-11-09 16:14:51,934 - root - INFO -   Total validation time: 1.6165187358856201 sec
+2022-11-09 16:15:19,669 - root - INFO - Time taken for epoch 3 is 27.71122097969055 sec, avg 147.81015975448872 samples/sec
+2022-11-09 16:15:19,671 - root - INFO -   Avg train loss=0.018199
+2022-11-09 16:15:21,012 - root - INFO -   Avg val loss=0.020106
+2022-11-09 16:15:21,012 - root - INFO -   Total validation time: 1.3401463031768799 sec
+2022-11-09 16:15:48,762 - root - INFO - Time taken for epoch 4 is 27.7261164188385 sec, avg 147.73075096867782 samples/sec
+2022-11-09 16:15:48,762 - root - INFO -   Avg train loss=0.016480
+2022-11-09 16:15:49,956 - root - INFO -   Avg val loss=0.019319
+2022-11-09 16:15:49,956 - root - INFO -   Total validation time: 1.193620204925537 sec
 ```
 From here, we can see that running in FP32 without TF32 acceleration is much slower and we are already seeing great performance from
 TF32 Tensor Core operations without any code changes to add AMP. With that said, AMP can still be a useful improvement for A100 GPUs,
@@ -380,43 +404,48 @@ as TF32 is a compute type only, leaving all data in full precision FP32. FP16 pr
 
 We can run this experiment using AMP on Perlmutter by running the following command:
 ```
-sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem --amp_mode=fp16
 ```
 If running interactively:
 ```
-python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp
+python train.py --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem --amp_mode=fp16
 ```
 
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP:
+This is the performance of the training script for the first four epochs on a 40GB A100 card with batch size 64, DALI, and AMP:
 ```
-2021-11-09 20:15:47,161 - root - INFO - Time taken for epoch 1 is 262.75472021102905 sec, avg 15.588682847297035 samples/sec
-2021-11-09 20:15:47,162 - root - INFO -   Avg train loss=0.065478
-2021-11-09 20:15:52,365 - root - INFO -   Avg val loss=0.044170
-2021-11-09 20:15:52,365 - root - INFO -   Total validation time: 5.2027716636657715 sec
-2021-11-09 20:16:00,747 - root - INFO - Time taken for epoch 2 is 8.379497528076172 sec, avg 488.8121258197197 samples/sec
-2021-11-09 20:16:00,747 - root - INFO -   Avg train loss=0.027784
-2021-11-09 20:16:01,719 - root - INFO -   Avg val loss=0.026852
-2021-11-09 20:16:01,719 - root - INFO -   Total validation time: 0.9710891246795654 sec
-2021-11-09 20:16:09,708 - root - INFO - Time taken for epoch 3 is 7.986395835876465 sec, avg 512.8721496122143 samples/sec
-2021-11-09 20:16:09,709 - root - INFO -   Avg train loss=0.020997
-2021-11-09 20:16:10,394 - root - INFO -   Avg val loss=0.024537
-2021-11-09 20:16:10,394 - root - INFO -   Total validation time: 0.6851544380187988 sec
+2022-11-09 16:30:03,601 - root - INFO - Time taken for epoch 1 is 293.50703406333923 sec, avg 13.737319832443568 samples/sec
+2022-11-09 16:30:03,602 - root - INFO -   Avg train loss=0.065381
+2022-11-09 16:30:03,603 - root - WARNING - DALI iterator does not support resetting while epoch is not finished.                              Ignoring...
+2022-11-09 16:30:11,238 - root - INFO -   Avg val loss=0.042530
+2022-11-09 16:30:11,238 - root - INFO -   Total validation time: 7.635042905807495 sec
+2022-11-09 16:30:23,569 - root - INFO - Time taken for epoch 2 is 12.32933497428894 sec, avg 332.21580957461373 samples/sec
+2022-11-09 16:30:23,570 - root - INFO -   Avg train loss=0.027131
+2022-11-09 16:30:24,948 - root - INFO -   Avg val loss=0.026105
+2022-11-09 16:30:24,949 - root - INFO -   Total validation time: 1.378551721572876 sec
+2022-11-09 16:30:30,479 - root - INFO - Time taken for epoch 3 is 5.5291588306427 sec, avg 740.7998441462547 samples/sec
+2022-11-09 16:30:30,479 - root - INFO -   Avg train loss=0.018360
+2022-11-09 16:30:31,495 - root - INFO -   Avg val loss=0.021196
+2022-11-09 16:30:31,495 - root - INFO -   Total validation time: 1.015498161315918 sec
+2022-11-09 16:30:36,787 - root - INFO - Time taken for epoch 4 is 5.289811372756958 sec, avg 774.3187254454474 samples/sec
+2022-11-09 16:30:36,787 - root - INFO -   Avg train loss=0.016491
+2022-11-09 16:30:37,415 - root - INFO -   Avg val loss=0.020216
+2022-11-09 16:30:37,415 - root - INFO -   Total validation time: 0.6275067329406738 sec
 ```
 
-We can run the case with AMP enabled through profiler using the instructions in the earlier section with the added `--data_loader_config=enable_amp`
-argument and load that profile in Nsight Systems. This is what this profile ([`dali_amp.qdrep`](sample_nsys_profiles/dali_amp.qdrep)) looks like:
+We can run the case with AMP enabled through profiler using the instructions in the earlier section with the added `--amp_mode=fp16`
+argument and load that profile in Nsight Systems. This is what this profile ([`dali_amp.nsys-rep`](sample_nsys_profiles/dali_amp.nsys-rep)) looks like:
 ![NSYS DALI AMP](tutorial_images/nsys_dali_amp.png)
 
 and zoomed in to a single iteration:
 ![NSYS DALI AMP Zoomed](tutorial_images/nsys_dali_amp_zoomed.png)
 
-With AMP enabled, we see that the `forward` (and, correspondingly the backward) time is significatly reduced. As this is a CNN, the forward and backward convolution ops are well-suited to benefit from acceleration with tensor cores and that is where we see the most benefit.
+With AMP enabled, we see that the `forward` (and, correspondingly the backward) time is significantly reduced. As this is a CNN, the forward and backward convolution ops are well-suited to benefit from acceleration with tensor cores and that is where we see the most benefit.
 
 Running this case using benchy on Perlmutter results in the following throughput measurements:
 ```
-BENCHY::SUMMARY::IO average trial throughput: 786.928 +/- 6.439
-BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 661.640 +/- 0.025
-BENCHY::SUMMARY::FULL average trial throughput: 512.194 +/- 0.569
+BENCHY::SUMMARY::IO average trial throughput: 929.612 +/- 92.659
+BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 820.332 +/- 0.371
+BENCHY::SUMMARY::FULL average trial throughput: 665.790 +/- 1.026
 ```
 From these results, we can see a big improvement in the `SYNTHETIC` and `FULL` throughput from using mixed-precision training over
 TF32 alone.
@@ -430,27 +459,31 @@ reuse. We can enabled the use of the `FusedAdam` optimizer in our training scrip
 
 We can run this experiment using APEX on Perlmutter by running the following command:
 ```
-sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem --amp_mode=fp16 --enable_apex
 ```
 If running interactively:
 ```
-python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex
+python train.py --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem --amp_mode=fp16 --enable_apex
 ```
 
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP, and APEX:
+This is the performance of the training script for the first four epochs on a 40GB A100 card with batch size 64, DALI, and AMP, and APEX:
 ```
-021-11-09 20:22:21,666 - root - INFO - Time taken for epoch 1 is 262.5772747993469 sec, avg 15.599217423251996 samples/sec
-2021-11-09 20:22:21,673 - root - INFO -   Avg train loss=0.068312
-2021-11-09 20:22:28,518 - root - INFO -   Avg val loss=0.045140
-2021-11-09 20:22:28,531 - root - INFO -   Total validation time: 6.844818353652954 sec
-2021-11-09 20:22:36,945 - root - INFO - Time taken for epoch 2 is 8.411178827285767 sec, avg 486.97098041865706 samples/sec
-2021-11-09 20:22:36,946 - root - INFO -   Avg train loss=0.030577
-2021-11-09 20:22:38,057 - root - INFO -   Avg val loss=0.028168
-2021-11-09 20:22:38,057 - root - INFO -   Total validation time: 1.110574722290039 sec
-2021-11-09 20:22:45,729 - root - INFO - Time taken for epoch 3 is 7.669205904006958 sec, avg 534.0839783503462 samples/sec
-2021-11-09 20:22:45,759 - root - INFO -   Avg train loss=0.023003
-2021-11-09 20:22:46,480 - root - INFO -   Avg val loss=0.025598
-2021-11-09 20:22:46,497 - root - INFO -   Total validation time: 0.7205066680908203 sec
+2022-11-09 16:41:30,604 - root - INFO - Time taken for epoch 1 is 244.000159740448 sec, avg 16.52457934572251 samples/sec
+2022-11-09 16:41:30,605 - root - INFO -   Avg train loss=0.067127
+2022-11-09 16:41:38,195 - root - INFO -   Avg val loss=0.042797
+2022-11-09 16:41:38,195 - root - INFO -   Total validation time: 7.589394569396973 sec
+2022-11-09 16:41:50,463 - root - INFO - Time taken for epoch 2 is 12.266955137252808 sec, avg 333.90519115547215 samples/sec
+2022-11-09 16:41:50,463 - root - INFO -   Avg train loss=0.028232
+2022-11-09 16:41:51,829 - root - INFO -   Avg val loss=0.025897
+2022-11-09 16:41:51,829 - root - INFO -   Total validation time: 1.3656654357910156 sec
+2022-11-09 16:41:57,088 - root - INFO - Time taken for epoch 3 is 5.256546497344971 sec, avg 779.2188278119196 samples/sec
+2022-11-09 16:41:57,088 - root - INFO -   Avg train loss=0.018998
+2022-11-09 16:41:58,074 - root - INFO -   Avg val loss=0.021492
+2022-11-09 16:41:58,075 - root - INFO -   Total validation time: 0.9862794876098633 sec
+2022-11-09 16:42:03,412 - root - INFO - Time taken for epoch 4 is 5.336004257202148 sec, avg 767.6155794800048 samples/sec
+2022-11-09 16:42:03,412 - root - INFO -   Avg train loss=0.017139
+2022-11-09 16:42:04,020 - root - INFO -   Avg val loss=0.020624
+2022-11-09 16:42:04,020 - root - INFO -   Total validation time: 0.6071317195892334 sec
 ```
 
 While APEX provides some already fused kernels, for more general fusion of eligible pointwise operations in PyTorch, we can enable
@@ -458,30 +491,34 @@ JIT compilation, done in our training script via the flag `--enable_jit`.
 
 We can run this experiment using JIT on Perlmutter by running the following command:
 ```
-sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
+sbatch -n 1 ./submit_pm.sh --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem --amp_mode=fp16 --enable_apex --enable_jit
 ```
 If running interactively:
 ```
-python train.py --config=short --num_epochs 3 --num_data_workers 4 --data_loader_config=dali-lowmem --enable_amp --enable_apex --enable_jit
+python train.py --config=short --num_epochs 4 --num_data_workers 8 --data_loader_config=dali-lowmem --amp_mode=fp16 --enable_apex --enable_jit
 ```
 
-This is the performance of the training script for the first three epochs on a 40GB A100 card with batch size 64, DALI, and AMP, APEX and JIT:
+This is the performance of the training script for the first four epochs on a 40GB A100 card with batch size 64, DALI, and AMP, APEX and JIT:
 ```
-2021-11-09 20:22:39,140 - root - INFO - Time taken for epoch 1 is 278.4678325653076 sec, avg 14.709059794327901 samples/sec
-2021-11-09 20:22:39,165 - root - INFO -   Avg train loss=0.071150
-2021-11-09 20:22:45,981 - root - INFO -   Avg val loss=0.043798
-2021-11-09 20:22:45,988 - root - INFO -   Total validation time: 6.814955234527588 sec
-2021-11-09 20:22:54,241 - root - INFO - Time taken for epoch 2 is 8.250621557235718 sec, avg 496.44744599973154 samples/sec
-2021-11-09 20:22:54,248 - root - INFO -   Avg train loss=0.030859
-2021-11-09 20:22:55,358 - root - INFO -   Avg val loss=0.028591
-2021-11-09 20:22:55,359 - root - INFO -   Total validation time: 1.1095085144042969 sec
-2021-11-09 20:23:02,919 - root - INFO - Time taken for epoch 3 is 7.557044267654419 sec, avg 542.0108517203818 samples/sec
-2021-11-09 20:23:02,944 - root - INFO -   Avg train loss=0.023427
-2021-11-09 20:23:03,665 - root - INFO -   Avg val loss=0.025971
-2021-11-09 20:23:03,665 - root - INFO -   Total validation time: 0.7198197841644287 sec
+2022-11-09 16:43:43,077 - root - INFO - Time taken for epoch 1 is 238.02903866767883 sec, avg 16.93910970933771 samples/sec
+2022-11-09 16:43:43,081 - root - INFO -   Avg train loss=0.075173
+2022-11-09 16:43:50,692 - root - INFO -   Avg val loss=0.048126
+2022-11-09 16:43:50,692 - root - INFO -   Total validation time: 7.610842704772949 sec
+2022-11-09 16:44:03,150 - root - INFO - Time taken for epoch 2 is 12.457206010818481 sec, avg 328.80567251138194 samples/sec
+2022-11-09 16:44:03,151 - root - INFO -   Avg train loss=0.030912
+2022-11-09 16:44:04,513 - root - INFO -   Avg val loss=0.027476
+2022-11-09 16:44:04,513 - root - INFO -   Total validation time: 1.362241506576538 sec
+2022-11-09 16:44:09,757 - root - INFO - Time taken for epoch 3 is 5.242457389831543 sec, avg 781.3129788989315 samples/sec
+2022-11-09 16:44:09,758 - root - INFO -   Avg train loss=0.020107
+2022-11-09 16:44:10,752 - root - INFO -   Avg val loss=0.021986
+2022-11-09 16:44:10,752 - root - INFO -   Total validation time: 0.9937717914581299 sec
+2022-11-09 16:44:15,990 - root - INFO - Time taken for epoch 4 is 5.2364501953125 sec, avg 782.2092920250833 samples/sec
+2022-11-09 16:44:15,990 - root - INFO -   Avg train loss=0.017781
+2022-11-09 16:44:16,587 - root - INFO -   Avg val loss=0.020978
+2022-11-09 16:44:16,587 - root - INFO -   Total validation time: 0.5963444709777832 sec
 ```
 
-Running a profile ([`dali_amp_apex_jit.qdrep`](sample_nsys_profiles/dali_amp_apex_jit.qdrep)) using these new options and loading in Nsight Systems looks like this:
+Running a profile ([`dali_amp_apex_jit.nsys-rep`](sample_nsys_profiles/dali_amp_apex_jit.nsys-rep)) using these new options and loading in Nsight Systems looks like this:
 ![NSYS DALI AMP APEX JIT](tutorial_images/nsys_dali_amp_apex_jit.png)
 
 and zoomed in to a single iteration:
@@ -489,9 +526,9 @@ and zoomed in to a single iteration:
 
 Running this case with APEX and JIT enabled using benchy on Perlmutter results in the following throughput measurements:
 ```
-BENCHY::SUMMARY::IO average trial throughput: 792.513 +/- 37.445
-BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 707.966 +/- 0.318
-BENCHY::SUMMARY::FULL average trial throughput: 538.593 +/- 0.193
+BENCHY::SUMMARY::IO average trial throughput: 936.818 +/- 95.516
+BENCHY::SUMMARY:: SYNTHETIC average trial throughput: 893.160 +/- 0.250
+BENCHY::SUMMARY::FULL average trial throughput: 683.573 +/- 1.248
 ```
 We see a modest gain in the `SYNTHETIC` throughput, resuling in a slight increase in the `FULL` throughput.
 
