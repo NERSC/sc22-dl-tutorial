@@ -288,7 +288,7 @@ argument and load that profile in Nsight Systems. This is what this profile ([`1
 and zoomed in:
 ![NSYS Native Data Zoomed](tutorial_images/nsys_nativedata_16workers_zoomed.png)
 
-With 16 data workers, the large gaps between steps are mostly alleviated, improving the throughput. Looking at the zoomed in profile, we
+With 16 data workers, the large gaps between steps somewhat alleviated, improving the throughput. However, from the zoomed out view, we still see large gaps between groups of 16 iterations. Looking at the zoomed in profile, we
 still see that the H2D copy in of the input data takes some time and could be improved. One option here is to implement a prefetching
 mechanism in PyTorch directly using CUDA streams to concurrently load and copy in the next batch of input during the current batch, however
 this is left as an exercise outside of this tutorial. A good example of this can be found in [here](https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Classification/ConvNets/image_classification/dataloaders.py#L347).
@@ -353,7 +353,7 @@ and zoomed in to a single iteration:
 ![NSYS DALI Zoomed](tutorial_images/nsys_dali_zoomed.png)
 
 With DALI, you will see that there are now multiple CUDA stream rows in the timeline view, corresponding to internal streams DALI uses
-to run data augmentation kernels and any memory movement concurrently with the existing PyTorch compute kernels. Stream 13 in this view, in particular, shows concurrent H2D memory copies of the batch input data, which is an improvement over the native dataloader.
+to run data augmentation kernels and any memory movement concurrently with the existing PyTorch compute kernels. Stream 16 in this view, in particular, shows concurrent H2D memory copies of the batch input data, which is an improvement over the native dataloader.
 
 Running this case using benchy on Perlmutter results in the following throughput measurements:
 ```
@@ -439,7 +439,7 @@ argument and load that profile in Nsight Systems. This is what this profile ([`d
 and zoomed in to a single iteration:
 ![NSYS DALI AMP Zoomed](tutorial_images/nsys_dali_amp_zoomed.png)
 
-With AMP enabled, we see that the `forward` (and, correspondingly the backward) time is significatly reduced. As this is a CNN, the forward and backward convolution ops are well-suited to benefit from acceleration with tensor cores and that is where we see the most benefit.
+With AMP enabled, we see that the `forward` (and, correspondingly the backward) time is significantly reduced. As this is a CNN, the forward and backward convolution ops are well-suited to benefit from acceleration with tensor cores and that is where we see the most benefit.
 
 Running this case using benchy on Perlmutter results in the following throughput measurements:
 ```
