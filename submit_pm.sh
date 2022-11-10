@@ -4,19 +4,17 @@
 #SBATCH --ntasks-per-node 4
 #SBATCH --cpus-per-task 32
 #SBATCH --gpus-per-node 4
-#SBATCH --time=0:10:00
+#SBATCH --time=0:15:00
 #SBATCH --image=nersc/sc22-dl-tutorial:latest
 #SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
 
 DATADIR=/pscratch/sd/j/joshr/nbody2hydro/datacopies
-LOGDIR=${SCRATCH}/sc21-dl-tutorial/logs
+LOGDIR=${SCRATCH}/sc22-dl-tutorial/logs
 mkdir -p ${LOGDIR}
 args="${@}"
 
 hostname
-
-#~/dummy
 
 export NCCL_NET_GDR_LEVEL=PHB
 
@@ -33,6 +31,9 @@ BENCHY_OUTPUT=${BENCHY_OUTPUT:-"benchy_output"}
 sed "s/.*output_filename.*/        output_filename: ${BENCHY_OUTPUT}.json/" ${BENCHY_CONFIG} > benchy-run-${SLURM_JOBID}.yaml
 export BENCHY_CONFIG_FILE=benchy-run-${SLURM_JOBID}.yaml
 export MASTER_ADDR=$(hostname)
+
+# Reversing order of GPUs to match default CPU affinities from Slurm
+export CUDA_VISIBLE_DEVICES=3,2,1,0
 
 set -x
 srun -u shifter -V ${DATADIR}:/data -V ${LOGDIR}:/logs \

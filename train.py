@@ -92,6 +92,7 @@ def train(params, args, local_rank, world_rank, world_size):
   iters = 0
   t1 = time.time()
   for epoch in range(startEpoch, startEpoch+params.num_epochs):
+    torch.cuda.synchronize() # device sync to ensure accurate epoch timings
     start = time.time()
     tr_loss = []
     tr_time = 0.
@@ -102,9 +103,9 @@ def train(params, args, local_rank, world_rank, world_size):
     step_count = 0
     for i, data in enumerate(train_data_loader, 0):
       if (args.enable_manual_profiling and world_rank==0):
-          if (epoch == 1 and i == 0):
+          if (epoch == 3 and i == 0):
               torch.cuda.profiler.start()
-          if (epoch == 1 and i == 59):
+          if (epoch == 3 and i == 59):
               torch.cuda.profiler.stop()
 
       if args.enable_manual_profiling: torch.cuda.nvtx.range_push(f"step {i}")
@@ -144,6 +145,7 @@ def train(params, args, local_rank, world_rank, world_size):
       dat_time += tr_start - dat_start
       step_count += 1
 
+    torch.cuda.synchronize() # device sync to ensure accurate epoch timings
     end = time.time()
     if world_rank==0:
       logging.info('Time taken for epoch {} is {} sec, avg {} samples/sec'.format(epoch + 1, end-start,
@@ -209,14 +211,14 @@ if __name__ == '__main__':
 
   # Update config with modified args
   # set up amp
-  if args.amp_mode is not None:
+  if args.amp_mode is not 'none':
     params.update({"amp_mode": args.amp_mode})
   amp_dtype = torch.float32
   if params.amp_mode == "fp16":
     amp_dtype = torch.float16
   elif params.amp_mode == "bf16":
     amp_dtype = torch.bfloat16    
-  params.update({"amp_enabled": amp_dtype is not None,
+  params.update({"amp_enabled": amp_dtype is not torch.float32,
                  "amp_dtype" : amp_dtype, 
                  "enable_apex" : args.enable_apex,
                  "enable_jit" : args.enable_jit,
