@@ -640,7 +640,7 @@ the multi-GPU training with Nsight Systems to understand the communication perfo
 
 First we want to measure the scaling efficiency. An example command to generate the points for 8 nodes is:
 ```
-BENCHY_OUTPUT=weak_scale sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy
+BENCHY_OUTPUT=weak_scale sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy --num_epochs 15
 ```
 
 <img src="tutorial_images/scale_perfEff.png" width="500">
@@ -649,7 +649,7 @@ The plot shows the throughput as we scale up to 32 nodes. The solid green line s
 
 Next we can further breakdown the performance of the applications, by switching off the communication between workers. An example command to generate the points for 8 nodes and adding the noddp flag is:
 ```
-BENCHY_OUTPUT=weak_scale_noddp sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy --noddp
+BENCHY_OUTPUT=weak_scale_noddp sbatch -N 8 ./submit_pm.sh --num_data_workers 4 --local_batch_size 64 --config=bs64_opt --enable_benchy --noddp --num_epochs 15
 ```
 
 <img src="tutorial_images/scale_perfComm.png" width="500">
