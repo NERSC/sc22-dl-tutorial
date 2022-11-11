@@ -17,7 +17,7 @@ This repository contains the example code material for the SC22 tutorial:
 
 Tutorial slides: https://drive.google.com/drive/folders/1T8u7kA-PLgs1rhFxF7zT7c81HJ2bouWO?usp=sharing
 
-Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invite/zt-yma1xh4z-D5cOLy4F~ZzVfNkNg96P3A
+Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invite/zt-1jnpj4ggz-ks4dCyCsI8Z8iVRWO4LBsg
 
 NERSC JupyterHub: https://jupyter.nersc.gov
 
