@@ -5,7 +5,7 @@ module use /sw/aaims/summit/modulefiles
 module load open-ce-pyt
 
 DATADIR=/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data
-LOGDIR=$WORLDWORK/stf011/$USER/sc22-dl-tutorial/logs
+LOGDIR=$WORLDWORK/trn001/$USER/sc22-dl-tutorial/logs
 mkdir -p ${LOGDIR}
 
 if [ "$1" != "-g" ]; then
