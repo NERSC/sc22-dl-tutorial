@@ -1,6 +1,6 @@
 # SC22 Deep Learning at Scale Tutorial (Summit Commands)
 
-Please refear to main [(README.md)](https://github.com/tsaris/sc22-dl-tutorial/blob/main/README.md) for details of the tutorial and how to run on NERSC's Perlmutter machine. This page has the commands on how to run on OLCF's Summit machine.
+Please refer to main [(README.md)](https://github.com/tsaris/sc22-dl-tutorial/blob/main/README.md) for details of the tutorial and how to run on NERSC's Perlmutter machine. This page has the commands on how to run on OLCF's Summit machine.
 
 Data location on Summit: `/gpfs/alpine/stf011/world-shared/atsaris/SC22_tutorial_data`
 
@@ -13,7 +13,7 @@ For running jobs on Summit, we will use training accounts which are provided und
 
 To begin, start a terminal and login to Summit:
 ```bash
-mkdir -p $WORLDWORK/trn001/$USER/
+mkdir -p $WORLDWORK/trn001/$USER
 cd $WORLDWORK/trn001/$USER/
 git clone https://github.com/tsaris/sc22-dl-tutorial.git
 cd sc22-dl-tutorial
@@ -29,12 +29,13 @@ already have an account to access the download. Proceed to run and install the p
 
 On Summit for the tutorial, we will be submitting jobs to the batch queue. To submit this job, use the following command:
 ```
-bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=shorter_sm --num_epochs 3"
+bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=shorter_sm --num_epochs 3"
 ```
 
 To view the results in TensorBoard:
 * login to `jupyter.olcf.ornl.gov` from your browsher with the olcf credentials
 * from `jupyter.olcf.ornl.gov` open the file `start_tensorboard_summit.ipynb` that you can find after you clone the repo at `$WORLDWORK/trn001/$USER/sc22-dl-tutorial`
+* select option `SC22 Training Series Lab for DL Tutorial Participants`
 
 ## Single GPU performance profiling and optimization [(Look Perlmutter section for more details)](https://github.com/tsaris/sc22-dl-tutorial/blob/main/README.md#single-gpu-performance-profiling-and-optimization)</sup></sub>
 
@@ -60,7 +61,7 @@ This is the performance of the baseline script with `Nsamples: 512` and `Nsample
 
 To generate a profile using our scripts on Summit, run the following command:
 ```
-ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 2 --enable_manual_profiling"
+ENABLE_PROFILING=1 PROFILE_OUTPUT=baseline bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=short_sm --num_epochs 2 --enable_manual_profiling"
 ```
 This command will run two epochs of the training script, profiling only 30 steps of the second epoch. It will produce a file baseline.qdrep that can be opened in the Nsight System's program.
 
@@ -68,7 +69,7 @@ This command will run two epochs of the training script, profiling only 30 steps
 
 To run using using benchy on Summit, use the following command:
 ```
-bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --enable_benchy"
+bsub -P trn001 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --enable_benchy"
 ```
 benchy uses epoch boundaries to separate the test trials it runs, so in these cases we increase the epoch limit to 10 to ensure the full experiment runs.
 
@@ -90,7 +91,7 @@ The PyTorch dataloader has several knobs we can adjust to improve performance. O
 
 We can run this experiment on Summit by running the following command. This will take ~1h so we recommend go to start the runs with the DALI optimization already in from the next section.
 ```
-bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --enable_benchy"
+bsub -P trn001 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --enable_benchy"
 ```
 output
 ```
@@ -104,7 +105,7 @@ BENCHY::SUMMARY::FULL average trial throughput: 4.212 +/- 0.065
 To use NVIDIA DALI use the `-data_loader_config=dali-lowmem` flag.
 
 ```
-bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --enable_benchy"
+bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --enable_benchy"
 ```
 output
 ```
@@ -118,7 +119,7 @@ BENCHY::SUMMARY::FULL average trial throughput: 101.400 +/- 0.020
 To enable mixed precision training use the `--amp_mode fp16` flag. On Summit the bf16 won't work.
 
 ```
-bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_benchy"
+bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_benchy"
 ```
 output
 ```
@@ -132,7 +133,7 @@ BENCHY::SUMMARY::FULL average trial throughput: 260.223 +/- 1.274
 To enable APEX use the `--enable_apex` flag.
 
 ```
-bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_apex --enable_benchy"
+bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_apex --enable_benchy"
 ```
 output
 ```
@@ -144,7 +145,7 @@ BENCHY::SUMMARY::FULL average trial throughput: 281.767 +/- 7.210
 To enable JIT use the `--enable_jit` flag.
 
 ```
-bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_apex --enable_jit --enable_benchy"
+bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=short_sm --num_epochs 10 --num_data_workers 7 --data_loader_config=dali-lowmem --amp_mode fp16 --enable_apex --enable_jit --enable_benchy"
 ```
 output
 ```
@@ -158,7 +159,7 @@ BENCHY::SUMMARY::FULL average trial throughput: 285.010 +/- 0.068
 Now you can run the full model training on a single GPU with our optimizations. For convenience, we provide a configuration with the optimizations already enabled for 3 epochs. Submit the full training with:
 
 ```
-bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 1 --config=bs32_opt_sm"
+bsub -P trn001 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 1 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 1 --config=bs32_opt_sm"
 ```
 output
 ```
@@ -187,7 +188,7 @@ To enable multi-gpu training, we need to have the `-g 6`, since Summit has six G
 As a first attempt, let's try increasing the batchsize from 32 to 576, distributing our training across 18 GPUs (thus 3 Summit nodes). To submit a job with this config, do
 
 ```
-bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs576_test_sm"
+bsub -P trn001 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs576_test_sm"
 ```
 output
 ```
@@ -211,7 +212,7 @@ Looking at the TensorBoard log, we can see that the rate of convergence is incre
 If we increase the total number of epochs, we will run longer (thus giving the model more training iterations to update weights) and the learning rate will decay more slowly, giving us more time to converge quickly with a larger learning rate. To try this out, run the `bs576_opt_sm` config, which runs for 12 epochs rather than 3 on 18 GPUs as well:
 
 ```
-bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs576_opt_sm"
+bsub -P trn001 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 3 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs576_opt_sm"
 ```
 output
 ```
@@ -235,7 +236,7 @@ With the longer training, we can see that our higher batch size results are slig
 For 72 GPUs with 48 epochs and batch size of 2304
 
 ```
-bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 12 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs2304_opt_sm"
+bsub -P trn001 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 12 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs2304_opt_sm"
 ```
 output
 ```
@@ -257,7 +258,7 @@ output
 For 288 GPUs with 96 epochs and batch size of 9216.
 
 ```
-bsub -P stf218 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 48 -alloc_flags "gpumps smt4" -q debug "./submit_summit.sh -g 6 --config=bs9216_opt_sm"
+bsub -P trn001 -W 2:00 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 48 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs9216_opt_sm"
 ```
 output
 ```
@@ -288,7 +289,7 @@ You can find example json logs from benchy that run on 1 to 32 Summit nodes and 
 First we want to measure the scaling efficiency. An example command to generate the points for 8 nodes is:
 
 ```
-BENCHY_OUTPUT=weak_scale_8 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
+BENCHY_OUTPUT=weak_scale_8 bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy"
 ```
 
 <img src="tutorial_images/scale_perfEff_summit.png" width="500">
@@ -296,7 +297,7 @@ BENCHY_OUTPUT=weak_scale_8 bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o
 Next we can further breakdown the performance of the applications, by switching off the communication between workers. An example command to generate the points for 8 nodes and adding the noddp flag is:
 
 ```
-BENCHY_OUTPUT=weak_scale_8_noddp bsub -P stf218 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy --noddp"
+BENCHY_OUTPUT=weak_scale_8_noddp bsub -P trn001 -W 0:30 -J sc22.tut -o logs/sc22.tut.o%J -nnodes 8 -alloc_flags "gpumps smt4" "./submit_summit.sh -g 6 --config=bs32_opt_sm --num_epochs 10 --local_batch_size 32 --enable_benchy --noddp"
 ```
 
 <img src="tutorial_images/scale_perfComm_summit.png" width="500">
