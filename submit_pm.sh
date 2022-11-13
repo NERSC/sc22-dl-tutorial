@@ -6,6 +6,7 @@
 #SBATCH --gpus-per-node 4
 #SBATCH --time=0:15:00
 #SBATCH --image=nersc/sc22-dl-tutorial:latest
+#SBATCH --reservation=sc22_tutorial
 #SBATCH -J pm-crop64
 #SBATCH -o %x-%j.out
 
