@@ -21,7 +21,7 @@ Join the Slack workspace: https://join.slack.com/t/nersc-dl-tutorial/shared_invi
 
 NERSC JupyterHub: https://jupyter.nersc.gov
 
-Data download: https://portal.nersc.gov/project/dasrepo/pharring/
+Data download (only needed if you want to run our examples elsewhere): https://portal.nersc.gov/project/dasrepo/pharring/
 
 ## Installation and Setup
 
